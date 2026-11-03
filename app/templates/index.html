@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import category_select %}
+{% block content %}
+<h1>Found items</h1>
+<p class="muted">Items currently held at the IITGN security office. Lost something? <a href="{{ url_for('main.report_new') }}">File a lost report</a>.</p>
+
+<form class="filters" method="get">
+  <label>Search <input type="search" name="q" value="{{ args.get('q', '') }}" placeholder="bottle, wallet…"></label>
+  <label>Category {{ category_select(categories, args.get('category', ''), any_label='All categories') }}</label>
+  <label>Found from <input type="date" name="from" value="{{ args.get('from', '') }}"></label>
+  <label>to <input type="date" name="to" value="{{ args.get('to', '') }}"></label>
+  <button>Apply</button>
+  <a href="{{ url_for('main.index') }}">Clear</a>
+</form>
+
+{% if items %}
+<ul class="cards">
+  {% for item in items %}
+  <li class="card">
+    <strong>{{ item.title }}</strong>
+    <span class="muted">{{ item.category }} · found {{ item.date_found.strftime('%d %b %Y') }} · {{ item.general_area }}</span>
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('main.claim_item', item_id=item.id) }}">This is mine</a>
+    {% else %}
+      <a href="{{ url_for('main.login') }}">Log in to claim</a>
+    {% endif %}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>No items match.</p>
+{% endif %}
+{% endblock %}
