@@ -1,3 +1,8 @@
 big_spec.md
 hackathon_context.md
 plan.md
+.env
+.venv/
+instance/
+__pycache__/
+.pytest_cache/

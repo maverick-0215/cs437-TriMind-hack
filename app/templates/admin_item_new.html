@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, category_select %}
+{% block title %}Add found item{% endblock %}
+{% block content %}
+<h1>Add a found item</h1>
+<form class="stack" method="post" enctype="multipart/form-data">
+  {{ csrf() }}
+  <fieldset>
+    <legend>Public (everyone sees this)</legend>
+    <label>Category {{ category_select(categories, form.get('category', '')) }}</label>
+    <label>Title <input name="title" required placeholder="Steel bottle" value="{{ form.get('title', '') }}"></label>
+    <label>Date found <input type="date" name="date_found" required max="{{ today.isoformat() }}" value="{{ form.get('date_found', today.isoformat()) }}"></label>
+    <label>General area <input name="general_area" required placeholder="Library" value="{{ form.get('general_area', '') }}"></label>
+  </fieldset>
+  <fieldset>
+    <legend>Private (only admins see this)</legend>
+    <label>Exact location <input name="exact_location" required placeholder="Library 2nd floor, table near window" value="{{ form.get('exact_location', '') }}"></label>
+    <label>Description <textarea name="description" required rows="4" placeholder="Colour, brand, marks, contents…">{{ form.get('description', '') }}</textarea></label>
+    <label>Photo (optional) <input type="file" name="photo" accept="image/*"></label>
+  </fieldset>
+  <button>Add item</button>
+</form>
+{% endblock %}

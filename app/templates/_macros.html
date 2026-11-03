@@ -1,0 +1,8 @@
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endmacro %}
+
+{% macro category_select(categories, selected='', any_label=None) %}
+<select name="category" {% if not any_label %}required{% endif %}>
+  <option value="">{{ any_label or 'Choose…' }}</option>
+  {% for c in categories %}<option {% if c == selected %}selected{% endif %}>{{ c }}</option>{% endfor %}
+</select>
+{% endmacro %}
