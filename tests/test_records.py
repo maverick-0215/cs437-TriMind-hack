@@ -26,10 +26,10 @@ def test_S21_handover_is_logged_with_item_student_admin_and_time(admin, student,
     assert "guard@iitgn.ac.in" in table
 
 
-def test_S22_returned_items_are_not_on_public_list(anon, admin, student, add_item, claim_item):
+def test_S22_returned_items_are_not_on_found_items_list(admin, student, other, add_item, claim_item):
     item = add_item(title="Returned bottle")
     add_item(title="Still here")
     return_item(admin, student, item, claim_item)
 
-    assert "Returned bottle" not in anon.get("/").get_data(as_text=True)
-    assert [i["title"] for i in anon.get("/api/items").get_json()] == ["Still here"]
+    assert "Returned bottle" not in other.get("/").get_data(as_text=True)
+    assert [i["title"] for i in other.get("/api/items").get_json()] == ["Still here"]

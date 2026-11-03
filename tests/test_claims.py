@@ -52,7 +52,7 @@ def test_S17_approval_creates_6_digit_code_only_the_claimant_sees(admin, student
         assert code not in client.get(url).get_data(as_text=True), url
 
 
-def test_S18_rejecting_claim_makes_item_available_and_notifies_student(admin, anon, student, add_item, claim_item):
+def test_S18_rejecting_claim_makes_item_available_and_notifies_student(admin, student, add_item, claim_item):
     item = add_item(title="Rejected bottle")
     claim = claim_item(student, item)
     admin.post(f"/admin/claims/{claim.id}/reject")
@@ -61,7 +61,7 @@ def test_S18_rejecting_claim_makes_item_available_and_notifies_student(admin, an
 
     assert claim.status == "REJECTED"
     assert item.status == "AVAILABLE"
-    assert "Rejected bottle" in anon.get("/").get_data(as_text=True)
+    assert "Rejected bottle" in student.get("/").get_data(as_text=True)
     assert Notification.query.filter_by(user_id=claim.student_id).count() == 1
     assert "rejected" in student.get("/notifications").get_data(as_text=True)
 

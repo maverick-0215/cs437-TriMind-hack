@@ -23,9 +23,11 @@ def app(tmp_path):
     # Tests keep one app context open so they can query the DB between requests.
     # Flask reuses that context (and its `g`) for every request, and Flask-Login
     # caches the logged-in user on `g`. Clear it so each client is seen as itself.
-    @app.before_request
+    # It must run before the app's own login check, so it goes first in the list.
     def _forget_cached_user():
         g.pop("_login_user", None)
+
+    app.before_request_funcs.setdefault(None, []).insert(0, _forget_cached_user)
 
     with app.app_context():
         yield app

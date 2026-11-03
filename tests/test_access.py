@@ -75,3 +75,37 @@ def test_S3_logged_out_user_cannot_open_admin_routes(app, anon):
     for method, url in admin_urls(app):
         resp = anon.open(url, method=method)
         assert resp.status_code == 302 and "/login" in resp.headers["Location"], f"{method} {url}"
+
+
+def test_S23_logged_out_visitor_can_open_login_and_signup(anon):
+    assert anon.get("/login").status_code == 200
+    assert anon.get("/signup").status_code == 200
+
+
+def test_S23_logged_out_visitor_is_sent_to_login_from_every_other_page(app, anon, add_item):
+    add_item(title="Hidden bottle")
+    open_pages = {"/login", "/signup", "/static/<path:filename>"}
+    checked = 0
+    for rule in app.url_map.iter_rules():
+        if rule.rule in open_pages:
+            continue
+        url = re.sub(r"<[^>]+>", "1", rule.rule)
+        for method in rule.methods - {"HEAD", "OPTIONS"}:
+            resp = anon.open(url, method=method)
+            body = resp.get_data(as_text=True)
+            assert "Hidden bottle" not in body, f"{method} {url}"
+            if url.startswith("/api/"):
+                assert resp.status_code == 401, f"{method} {url}"
+            else:
+                assert resp.status_code == 302 and "/login" in resp.headers["Location"], f"{method} {url}"
+            checked += 1
+    assert checked >= 20  # guards against the check silently covering nothing
+
+
+def test_S23_after_logout_the_list_is_hidden_again(student, add_item):
+    add_item(title="Hidden bottle")
+    assert "Hidden bottle" in student.get("/").get_data(as_text=True)
+    student.post("/logout")
+    resp = student.get("/")
+    assert resp.status_code == 302 and "/login" in resp.headers["Location"]
+    assert student.get("/api/items").status_code == 401
