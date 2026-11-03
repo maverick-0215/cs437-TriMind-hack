@@ -19,7 +19,7 @@ from flask import (
 )
 from flask_login import current_user, login_required, login_user, logout_user
 
-from . import db
+from . import db, login_manager
 from .models import CATEGORIES, Claim, FoundItem, Handover, LostReport, Notification, User
 
 bp = Blueprint("main", __name__)
@@ -112,7 +112,24 @@ def template_globals():
     return {"unread_count": unread, "categories": CATEGORIES, "today": date.today()}
 
 
-# ---------- public ----------
+# ---------- login required everywhere (S23) ----------
+
+OPEN_ENDPOINTS = {"main.login", "main.signup", "static"}
+
+
+@bp.before_app_request
+def require_login():
+    """S23: logged-out visitors may only open the login and sign-up pages."""
+    if current_user.is_authenticated or request.endpoint in OPEN_ENDPOINTS:
+        return None
+    if request.endpoint is None:  # unknown URL: let it 404
+        return None
+    if request.path.startswith("/api/"):
+        return jsonify(error="Log in to see found items."), 401
+    return login_manager.unauthorized()  # redirect to /login?next=...
+
+
+# ---------- found-items list ----------
 
 @bp.route("/")
 def index():
@@ -128,6 +145,8 @@ def api_items():
 
 @bp.route("/signup", methods=["GET", "POST"])
 def signup():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.index"))
     if request.method == "POST":
         data, errors = read_form(("name", "email", "password"))
         email = data["email"].lower()
@@ -149,6 +168,8 @@ def signup():
 
 @bp.route("/login", methods=["GET", "POST"])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for("main.index"))
     if request.method == "POST":
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
@@ -167,7 +188,7 @@ def login():
 @bp.route("/logout", methods=["POST"])
 def logout():
     logout_user()
-    return redirect(url_for("main.index"))
+    return redirect(url_for("main.login"))
 
 
 # ---------- student: lost reports ----------

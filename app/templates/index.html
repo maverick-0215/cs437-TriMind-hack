@@ -19,11 +19,7 @@
   <li class="card">
     <strong>{{ item.title }}</strong>
     <span class="muted">{{ item.category }} · found {{ item.date_found.strftime('%d %b %Y') }} · {{ item.general_area }}</span>
-    {% if current_user.is_authenticated %}
-      <a href="{{ url_for('main.claim_item', item_id=item.id) }}">This is mine</a>
-    {% else %}
-      <a href="{{ url_for('main.login') }}">Log in to claim</a>
-    {% endif %}
+    <a href="{{ url_for('main.claim_item', item_id=item.id) }}">This is mine</a>
   </li>
   {% endfor %}
 </ul>

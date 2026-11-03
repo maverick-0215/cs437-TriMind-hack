@@ -3,6 +3,7 @@
 {% block title %}{{ 'Sign up' if mode == 'signup' else 'Log in' }}{% endblock %}
 {% block content %}
 <h1>{{ 'Sign up' if mode == 'signup' else 'Log in' }}</h1>
+<p class="muted">Log in with your IITGN email to see found items, report something you lost, or claim an item.</p>
 <form class="stack" method="post">
   {{ csrf() }}
   {% if mode == 'signup' %}<label>Name <input name="name" required value="{{ request.form.get('name', '') }}"></label>{% endif %}

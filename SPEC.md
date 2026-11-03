@@ -19,19 +19,20 @@ Each statement has at least one automated test that names its ID.
 - **S1.** Only `@iitgn.ac.in` emails can sign up or log in. Other emails are rejected.
 - **S2.** A user whose email is in `ADMIN_EMAILS` (set in `.env`) is an admin. Every other user is a student.
 - **S3.** A student gets 403 on every admin page and admin API route.
+- **S23.** A visitor who is not logged in sees only the login and sign-up pages. Every other page sends them to the login page, and the items API returns 401.
 
 ### Found items
 
 - **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo.
 - **S5.** A new found item has status `AVAILABLE`.
 
-### Public list
+### Found-items list
 
-- **S6.** Anyone, logged in or not, can see the category, title, date found and general area of every `AVAILABLE` item, newest first.
-- **S7.** The public list and its API never show private details.
-- **S8.** Anyone can filter the list by category.
-- **S9.** Anyone can filter the list by a date-found range.
-- **S10.** Anyone can search the list by keyword. The search matches title or category and ignores case.
+- **S6.** A logged-in user can see the category, title, date found and general area of every `AVAILABLE` item, newest first.
+- **S7.** The found-items list and its API never show private details.
+- **S8.** A logged-in user can filter the list by category.
+- **S9.** A logged-in user can filter the list by a date-found range.
+- **S10.** A logged-in user can search the list by keyword. The search matches title or category and ignores case.
 
 ### Lost reports
 
@@ -55,4 +56,4 @@ Each statement has at least one automated test that names its ID.
 ### Records
 
 - **S21.** Every handover is logged with the item, student, admin, date and time.
-- **S22.** Returned items do not appear on the public list.
+- **S22.** Returned items do not appear on the found-items list.
