@@ -1,0 +1,72 @@
+import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router'
+import { api } from '../../api'
+import { CATEGORIES, type AdminItem } from '../../types'
+
+export default function AdminItemNewPage() {
+  const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = new FormData(event.currentTarget)
+    if (!(form.get('photo') as File).size) form.delete('photo')
+    try {
+      const item = await api<AdminItem>('admin/items', { method: 'POST', body: form })
+      // S13: the item page shows the suggested lost reports right away.
+      navigate(`/admin/items/${item.id}`)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <>
+      <h1>Add found item</h1>
+      <form className="card stack" onSubmit={submit}>
+        <p className="muted">Everyone who logs in sees these:</p>
+        <label>
+          Category
+          <select name="category" required defaultValue="">
+            <option value="" disabled>
+              Choose…
+            </option>
+            {CATEGORIES.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Title
+          <input name="title" required maxLength={120} placeholder="Black phone" />
+        </label>
+        <label>
+          Date found
+          <input name="date_found" type="date" required />
+        </label>
+        <label>
+          General area
+          <input name="general_area" required maxLength={120} placeholder="Library" />
+        </label>
+
+        <p className="muted">
+          <span className="tag">private</span> Only the security office sees these:
+        </p>
+        <label>
+          Exact location
+          <input name="exact_location" required maxLength={200} placeholder="Reading hall, desk 14" />
+        </label>
+        <label>
+          Description
+          <textarea name="description" required rows={3} />
+        </label>
+        <label>
+          Photo (optional)
+          <input name="photo" type="file" accept="image/*" />
+        </label>
+        {error && <p className="error">{error}</p>}
+        <button>Add item</button>
+      </form>
+    </>
+  )
+}
