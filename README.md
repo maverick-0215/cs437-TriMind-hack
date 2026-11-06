@@ -18,20 +18,41 @@
 
 ## Run it
 
-Needs Python 3.11 or newer.
+The app has two parts: a Django API in `backend/` and a React + TypeScript site in `frontend/`. Needs Python 3.12+ and Node.js 20+.
+
+**Backend** (http://localhost:8000):
 
 ```bash
+cd backend
 python -m venv .venv
 # Windows (PowerShell): .venv\Scripts\Activate.ps1
 # macOS/Linux:          source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # set SECRET_KEY, and ADMIN_EMAILS to the guard's email
+cp .env.example .env      # then fill it in (see below)
+python manage.py migrate
+python manage.py runserver
 ```
 
-**Run:** `flask --app app run`, then open http://127.0.0.1:5000
+**Frontend** (http://localhost:5173, the address you open), in a second terminal:
 
-**Test:** `pytest`
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-To use the app as an admin, sign up with an email that is listed in `ADMIN_EMAILS`. Every other `@iitgn.ac.in` account is a student.
+**Settings in `backend/.env`:**
 
-What the app must do is listed in [SPEC.md](SPEC.md). Each statement (S1–S22) has tests in `tests/` whose names start with its ID.
+- `ADMIN_EMAILS`: the security guards' emails. Everyone else who logs in is a student.
+- `GOOGLE_CLIENT_ID`: login is "Sign in with Google", limited to `@iitgn.ac.in` accounts. Create a client ID in Google Cloud Console (APIs & Services → Credentials → OAuth client ID, type "Web application") and add `http://localhost:5173` under "Authorized JavaScript origins".
+- `DEV_LOGIN=1` (development only, needs `DEBUG=1`): log in by typing any `@iitgn.ac.in` email, without Google. Use it to try the app before the client ID exists. Never turn it on for real use.
+- `SECRET_KEY`: required unless `DEBUG=1`.
+
+**Test:**
+
+```bash
+cd backend && pytest
+cd frontend && npm test
+```
+
+What the app must do is listed in [SPEC.md](SPEC.md). Each statement (S1–S23) has backend tests in `backend/tests/` whose names start with its ID, and `test_spec_coverage.py` fails if any statement has none. The frontend tests in `frontend/src/routes.test.tsx` check the page-level rules (S3, S23).

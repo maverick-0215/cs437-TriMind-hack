@@ -1,0 +1,46 @@
+import pytest
+
+from lostfound.models import LostReport
+
+NEW_REPORT = {
+    "category": "Wallet",
+    "title": "Brown wallet",
+    "date_lost": "2026-10-05",
+    "place_lost": "Mess",
+    "private_details": "Metro card in the name of Asha",
+}
+
+
+@pytest.mark.django_db
+def test_S11_student_files_lost_report(student_client, student):
+    response = student_client.post("/api/reports", NEW_REPORT, format="json")
+    assert response.status_code == 201
+    report = LostReport.objects.get()
+    assert report.student == student
+    assert (report.category, report.title, str(report.date_lost), report.place_lost, report.private_details) == (
+        "Wallet", "Brown wallet", "2026-10-05", "Mess", "Metro card in the name of Asha",
+    )
+
+
+@pytest.mark.django_db
+def test_S11_missing_field_is_rejected(student_client):
+    assert student_client.post("/api/reports", {**NEW_REPORT, "place_lost": ""}, format="json").status_code == 400
+    assert not LostReport.objects.exists()
+
+
+@pytest.mark.django_db
+def test_S12_student_sees_only_own_reports(student_client, make_report, other_student):
+    make_report(title="Asha's wallet")
+    make_report(title="Ravi's keys", student=other_student, private_details="RAVI-SECRET")
+    response = student_client.get("/api/reports")
+    assert [r["title"] for r in response.json()] == ["Asha's wallet"]
+    assert "RAVI-SECRET" not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_S12_opening_another_students_report_is_404(student_client, other_client, make_report):
+    report = make_report()
+    assert student_client.get(f"/api/reports/{report.pk}").status_code == 200
+    response = other_client.get(f"/api/reports/{report.pk}")
+    assert response.status_code == 404
+    assert "PRIVATE-REPORT" not in response.content.decode()
