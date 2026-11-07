@@ -1,20 +1,13 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router'
 import { api, useApi } from '../../api'
 import { formatDate, formatDateTime } from '../../format'
-import type { AdminItemDetail, AdminReport } from '../../types'
+import type { AdminItemDetail } from '../../types'
 
-function ReportCard({ report, action }: { report: AdminReport; action?: ReactNode }) {
-  return (
-    <div className="card">
-      <strong>{report.title}</strong>
-      <p className="muted">
-        {report.student} · {report.category} · lost {formatDate(report.date_lost)} at {report.place_lost}
-      </p>
-      <p className="pre">{report.private_details}</p>
-      {action}
-    </div>
-  )
+const CLAIM_TEXT = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'approval cancelled',
 }
 
 export default function AdminItemPage() {
@@ -33,13 +26,13 @@ export default function AdminItemPage() {
     }
   }
 
-  function linkReport(reportId: number) {
-    act(`admin/items/${id}/link`, { report_id: reportId })
+  function approve(who: { report_id: number } | { email: string }) {
+    act(`admin/items/${id}/approve`, who)
   }
 
-  function onLinkAny(event: FormEvent<HTMLFormElement>) {
+  function onApproveEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    linkReport(Number(new FormData(event.currentTarget).get('report_id')))
+    approve({ email: String(new FormData(event.currentTarget).get('email')) })
   }
 
   function onHandover(event: FormEvent<HTMLFormElement>) {
@@ -82,24 +75,35 @@ export default function AdminItemPage() {
         {item.has_photo && <img className="photo" src={`/api/admin/items/${item.id}/photo`} alt={`Photo of ${item.title}`} />}
       </div>
 
-      <h2>Claims</h2>
-      {data.claims.length === 0 && <p className="empty">No claims.</p>}
-      {data.claims.map((c) => (
-        <div key={c.id} className="card">
-          <p>
-            <strong>{c.student}</strong> <span className="muted">· {formatDateTime(c.created_at)} · {c.status.toLowerCase()}</span>
+      {/* S16: the guard checks the person in person, then approves them. */}
+      {item.status === 'AVAILABLE' && (
+        <>
+          <h2>Who may own this</h2>
+          <p className="muted">
+            Students whose lost reports match this item by 60% or more. When one comes to the office, check their
+            identifying details against the item, then approve them.
           </p>
-          <p className="pre">{c.description}</p>
-          {c.status === 'PENDING' && (
-            <div className="row">
-              <button onClick={() => act(`admin/claims/${c.id}/approve`)}>Approve</button>
-              <button className="secondary" onClick={() => act(`admin/claims/${c.id}/reject`)}>
-                Reject
-              </button>
+          {data.candidates.length === 0 && <p className="empty">No matching lost reports yet.</p>}
+          {data.candidates.map((r) => (
+            <div key={r.id} className="card">
+              <p>
+                <strong>{r.student}</strong> <span className="status available">{r.score}% match</span>
+              </p>
+              <p className="muted">
+                {r.title} · {r.category} · lost {formatDate(r.date_lost)} at {r.place_lost}
+              </p>
+              <p className="pre">{r.private_details}</p>
+              <button onClick={() => approve({ report_id: r.id })}>Approve {r.student}</button>
             </div>
-          )}
-        </div>
-      ))}
+          ))}
+
+          <h3>Approve someone else</h3>
+          <form className="row" onSubmit={onApproveEmail}>
+            <input name="email" type="email" required placeholder="name@iitgn.ac.in" aria-label="Email to approve" />
+            <button>Approve</button>
+          </form>
+        </>
+      )}
 
       {data.awaiting_pickup_by && (
         <>
@@ -121,39 +125,24 @@ export default function AdminItemPage() {
         </p>
       )}
 
-      {item.status !== 'RETURNED' && (
+      {data.claims.length > 0 && (
         <>
-          <h2>Suggested lost reports</h2>
-          <p className="muted">Unlinked reports in the same category, lost on or before {formatDate(item.date_found)}.</p>
-          {data.suggestions.length === 0 && <p className="empty">No suggestions.</p>}
-          {data.suggestions.map((r) => (
-            <ReportCard key={r.id} report={r} action={<button onClick={() => linkReport(r.id)}>Link and notify</button>} />
+          <h2>Approvals</h2>
+          {data.claims.map((c) => (
+            <div key={c.id} className="card item-card">
+              <p>
+                <strong>{c.student}</strong>{' '}
+                <span className="muted">
+                  · {formatDateTime(c.created_at)} · {CLAIM_TEXT[c.status]}
+                </span>
+              </p>
+              {c.status === 'APPROVED' && data.awaiting_pickup_by === c.student && (
+                <button className="secondary" onClick={() => act(`admin/claims/${c.id}/cancel`)}>
+                  Cancel approval
+                </button>
+              )}
+            </div>
           ))}
-        </>
-      )}
-
-      <h2>Linked reports</h2>
-      {data.linked_reports.length === 0 && <p className="empty">None linked.</p>}
-      {data.linked_reports.map((r) => (
-        <ReportCard key={r.id} report={r} />
-      ))}
-
-      {item.status !== 'RETURNED' && data.link_options.length > 0 && (
-        <>
-          <h3>Link any report</h3>
-          <form className="row" onSubmit={onLinkAny}>
-            <select name="report_id" required defaultValue="">
-              <option value="" disabled>
-                Choose a lost report…
-              </option>
-              {data.link_options.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.category}: {r.title} ({r.student}){r.linked_item ? ' · linked elsewhere' : ''}
-                </option>
-              ))}
-            </select>
-            <button>Link and notify</button>
-          </form>
         </>
       )}
     </>

@@ -3,8 +3,8 @@ import { formatDate, formatDateTime } from '../format'
 import type { MyClaim } from '../types'
 
 const STATUS_TEXT = {
-  PENDING: 'Waiting for the security office to review',
-  REJECTED: 'Rejected',
+  PENDING: 'Waiting for the security office',
+  REJECTED: 'Approval cancelled by the security office',
 }
 
 export default function ClaimsPage() {
@@ -12,19 +12,23 @@ export default function ClaimsPage() {
 
   return (
     <>
-      <h1>My claims</h1>
+      <h1>Pickup codes</h1>
+      <p className="muted">
+        When the security office checks you and approves you for an item, your pickup code appears here. Tell it to the
+        guard to collect the item.
+      </p>
       {error && <p className="error">{error}</p>}
-      {claims?.length === 0 && <p className="empty">You haven't claimed any items.</p>}
+      {claims?.length === 0 && <p className="empty">No pickup codes yet.</p>}
       <ul className="cards">
         {claims?.map((c) => (
           <li key={c.id} className="card">
             <strong>{c.item.title}</strong>
             <p className="muted">
-              {c.item.category} · claimed {formatDate(c.created_at)}
+              {c.item.category} · approved {formatDate(c.created_at)}
             </p>
             {c.pickup_code ? (
               <>
-                <p>Approved. Show this pickup code at the security office:</p>
+                <p>Approved. Tell this pickup code to the guard:</p>
                 <p className="code">{c.pickup_code}</p>
               </>
             ) : c.code_used_at ? (

@@ -2,6 +2,8 @@ import pytest
 
 from lostfound.models import Claim, FoundItem, Handover, Notification
 
+from .conftest import ADMIN_EMAIL
+
 CODE = "482915"
 
 
@@ -10,8 +12,8 @@ def fixed_code(monkeypatch):
     monkeypatch.setattr("lostfound.services._six_digit_code", lambda: CODE)
 
 
-def _claim(client, item, description="Totoro sticker on the back"):
-    return client.post(f"/api/items/{item.pk}/claim", {"description": description}, format="json")
+def _approve(admin_client, item, **who):
+    return admin_client.post(f"/api/admin/items/{item.pk}/approve", who, format="json")
 
 
 def _hand_over(admin_client, item, code):
@@ -19,63 +21,72 @@ def _hand_over(admin_client, item, code):
 
 
 @pytest.fixture
-def approved_item(make_item, student_client, admin_client):
+def approved_item(make_item, make_report, admin_client):
     item = make_item()
-    _claim(student_client, item)
-    admin_client.post(f"/api/admin/claims/{item.claims.get().pk}/approve")
+    _approve(admin_client, item, report_id=make_report().pk)
     return item
 
 
 @pytest.mark.django_db
-def test_S16_student_claims_available_item(make_item, student_client, admin_client, student):
+def test_S14_students_cannot_claim_in_the_app(make_item, student_client):
     item = make_item()
-    assert _claim(student_client, item, "My phone has a Totoro sticker").status_code == 201
-    item.refresh_from_db()
-    assert item.status == FoundItem.Status.CLAIMED
-    assert item.claims.get().student == student
-    # The admin sees the claim next to the item's private details.
-    detail = admin_client.get(f"/api/admin/items/{item.pk}").json()
-    assert detail["claims"][0]["description"] == "My phone has a Totoro sticker"
-    assert detail["item"]["exact_location"] == "SECRET-LOCATION desk 14"
-    assert detail["item"]["description"] == "SECRET-DESCRIPTION cracked corner"
-
-
-@pytest.mark.django_db
-def test_S16_only_available_items_can_be_claimed(make_item, student_client, other_client):
-    item = make_item()
-    _claim(student_client, item)
-    assert _claim(other_client, item).status_code == 409
-    assert Claim.objects.count() == 1
-
-
-@pytest.mark.django_db
-def test_S16_admins_cannot_claim(make_item, admin_client):
-    assert _claim(admin_client, make_item()).status_code == 403
+    assert student_client.post(f"/api/items/{item.pk}/claim", {"description": "mine"}, format="json").status_code == 404
+    assert student_client.post(f"/api/admin/items/{item.pk}/approve", {"email": "asha@iitgn.ac.in"}).status_code == 403
     assert not Claim.objects.exists()
 
 
 @pytest.mark.django_db
-def test_S17_approval_creates_code_only_claimant_can_see(approved_item, student_client, other_client, admin_client):
-    claim = approved_item.claims.get()
-    assert claim.status == Claim.Status.APPROVED and claim.pickup_code == CODE
+def test_S16_admin_approves_student_from_matching_report(make_item, make_report, admin_client, student):
+    item, report = make_item(), make_report()
+    detail = admin_client.get(f"/api/admin/items/{item.pk}").json()
+    assert detail["item"]["exact_location"] == "SECRET-LOCATION desk 14"
+    assert [c["id"] for c in detail["candidates"]] == [report.pk]
+    assert _approve(admin_client, item, report_id=report.pk).status_code == 204
+    item.refresh_from_db()
+    assert item.status == FoundItem.Status.CLAIMED
+    claim = item.claims.get()
+    assert (claim.student, claim.status) == (student, Claim.Status.APPROVED)
+
+
+@pytest.mark.django_db
+def test_S16_admin_can_approve_by_email(make_item, admin_client):
+    item = make_item()
+    assert _approve(admin_client, item, email="Walk.In@iitgn.ac.in").status_code == 204
+    assert item.claims.get().student.email == "walk.in@iitgn.ac.in"
+    assert _approve(admin_client, make_item(), email="x@gmail.com").status_code == 400
+    assert _approve(admin_client, make_item(), email=ADMIN_EMAIL).status_code == 400
+
+
+@pytest.mark.django_db
+def test_S16_only_available_items_can_be_approved(approved_item, admin_client):
+    assert _approve(admin_client, approved_item, email="ravi@iitgn.ac.in").status_code == 409
+    assert Claim.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_S17_approval_creates_code_only_that_student_sees(approved_item, student_client, other_client, admin_client, student):
     assert student_client.get("/api/claims").json()[0]["pickup_code"] == CODE
     assert other_client.get("/api/claims").json() == []
     assert CODE not in admin_client.get(f"/api/admin/items/{approved_item.pk}").content.decode()
-    assert CODE not in admin_client.get("/api/admin/claims/pending").content.decode()
+    assert CODE not in admin_client.get("/api/admin/pickups").content.decode()
+    assert Notification.objects.filter(user=student, link="/claims").exists()
     assert not Notification.objects.filter(message__contains=CODE).exists()
 
 
 @pytest.mark.django_db
-def test_S18_rejecting_claim_makes_item_available_and_notifies(make_item, student_client, admin_client, student):
-    item = make_item()
-    _claim(student_client, item)
-    claim = item.claims.get()
-    assert admin_client.post(f"/api/admin/claims/{claim.pk}/reject").status_code == 204
-    item.refresh_from_db()
-    claim.refresh_from_db()
-    assert item.status == FoundItem.Status.AVAILABLE
-    assert claim.status == Claim.Status.REJECTED
-    assert Notification.objects.filter(user=student, message__contains="rejected").exists()
+def test_S18_cancelling_approval_makes_item_available(approved_item, admin_client, student, student_client):
+    claim = approved_item.claims.get()
+    assert admin_client.post(f"/api/admin/claims/{claim.pk}/cancel").status_code == 204
+    approved_item.refresh_from_db()
+    assert approved_item.status == FoundItem.Status.AVAILABLE
+    assert student_client.get("/api/claims").json()[0]["pickup_code"] is None
+    assert Notification.objects.filter(user=student, message__contains="cancelled").exists()
+
+
+@pytest.mark.django_db
+def test_S18_used_code_cannot_be_cancelled(approved_item, admin_client):
+    _hand_over(admin_client, approved_item, CODE)
+    assert admin_client.post(f"/api/admin/claims/{approved_item.claims.get().pk}/cancel").status_code == 409
 
 
 @pytest.mark.django_db
@@ -95,12 +106,11 @@ def test_S19_correct_code_marks_item_returned(approved_item, admin_client):
 
 
 @pytest.mark.django_db
-def test_S19_code_does_not_work_before_approval(make_item, student_client, admin_client):
+def test_S19_code_does_not_work_before_approval(make_item, admin_client):
     item = make_item()
-    _claim(student_client, item)
     assert _hand_over(admin_client, item, CODE).status_code == 400
     item.refresh_from_db()
-    assert item.status == FoundItem.Status.CLAIMED
+    assert item.status == FoundItem.Status.AVAILABLE
 
 
 @pytest.mark.django_db
@@ -122,6 +132,51 @@ def test_S21_handover_is_logged(approved_item, admin_client, admin_user, student
 
 
 @pytest.mark.django_db
-def test_S22_handed_over_item_leaves_the_list(approved_item, admin_client, student_client):
+def test_S22_returned_item_is_no_longer_a_match(approved_item, admin_client, other_client, other_student, make_report):
+    other_report = make_report(student=other_student)
     _hand_over(admin_client, approved_item, CODE)
-    assert student_client.get("/api/items").json() == []
+    assert other_client.get(f"/api/reports/{other_report.pk}").json()["matches"] == []
+    assert admin_client.get(f"/api/admin/items/{approved_item.pk}").json()["candidates"] == []
+
+
+def _report_status(student_client, report):
+    return student_client.get(f"/api/reports/{report.pk}").json()
+
+
+@pytest.mark.django_db
+def test_S27_report_closes_when_item_is_collected(make_item, make_report, admin_client, student_client):
+    item, report = make_item(), make_report()
+    assert _report_status(student_client, report)["status"] == "OPEN"
+    _approve(admin_client, item, report_id=report.pk)
+    body = _report_status(student_client, report)
+    assert body["status"] == "APPROVED" and body["matches"] == []
+    _hand_over(admin_client, item, CODE)
+    body = _report_status(student_client, report)
+    assert body["status"] == "CLOSED" and body["closed_at"] and body["item"]["title"] == "Black phone"
+    assert student_client.get("/api/reports").json()[0]["status"] == "CLOSED"
+
+
+@pytest.mark.django_db
+def test_S27_approval_by_email_uses_best_matching_report(make_item, make_report, admin_client, student_client, student):
+    item = make_item()
+    report = make_report()
+    unrelated = make_report(title="Brown wallet", category="Wallet", place_lost="Mess")
+    _approve(admin_client, item, email=student.email)
+    assert _report_status(student_client, report)["status"] == "APPROVED"
+    assert _report_status(student_client, unrelated)["status"] == "OPEN"
+
+
+@pytest.mark.django_db
+def test_S27_cancelling_reopens_report_and_closed_reports_stop_matching(
+    make_item, make_report, admin_client, student_client
+):
+    item, report = make_item(), make_report()
+    _approve(admin_client, item, report_id=report.pk)
+    admin_client.post(f"/api/admin/claims/{item.claims.get().pk}/cancel")
+    assert _report_status(student_client, report)["status"] == "OPEN"
+    _approve(admin_client, item, report_id=report.pk)
+    _hand_over(admin_client, item, CODE)
+    # A closed report is not suggested for a new item, and cannot be approved again.
+    other = make_item(title="Black phone again")
+    assert admin_client.get(f"/api/admin/items/{other.pk}").json()["candidates"] == []
+    assert _approve(admin_client, other, report_id=report.pk).status_code == 409

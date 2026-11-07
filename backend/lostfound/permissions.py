@@ -8,9 +8,17 @@ def email_allowed(email):
     return bool(local) and at == "@" and domain == settings.ALLOWED_EMAIL_DOMAIN
 
 
+def is_admin_email(email):
+    """S2: admins are the emails in ADMIN_EMAILS plus those added by an admin (S28)."""
+    from .models import AdminEmail
+
+    email = (email or "").strip().lower()
+    return email in settings.ADMIN_EMAILS or AdminEmail.objects.filter(email=email).exists()
+
+
 def is_admin(user):
-    """S2: admins are the emails listed in ADMIN_EMAILS; everyone else is a student."""
-    return user.is_authenticated and user.email.lower() in settings.ADMIN_EMAILS
+    """S2: everyone who is not an admin is a student."""
+    return user.is_authenticated and is_admin_email(user.email)
 
 
 class SessionAuthentication(authentication.SessionAuthentication):

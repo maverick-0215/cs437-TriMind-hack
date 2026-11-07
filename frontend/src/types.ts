@@ -50,14 +50,36 @@ export type Report = {
   date_lost: string
   place_lost: string
   private_details: string
-  linked_item: PublicItem | null
   created_at: string
+  // S27: OPEN, APPROVED (waiting for pickup) or CLOSED (collected).
+  status: ReportStatus
+  closed_at: string | null
+  item: PublicItem | null
 }
 
-export type AdminReport = Omit<Report, 'linked_item' | 'created_at'> & {
-  student: string
-  linked_item: number | null
+export type ReportStatus = 'OPEN' | 'APPROVED' | 'CLOSED'
+
+/** Badge text and colour class for each report status. */
+export const REPORT_STATUS: Record<ReportStatus, { label: string; className: string }> = {
+  OPEN: { label: 'Open', className: 'available' },
+  APPROVED: { label: 'Ready for pickup', className: 'claimed' },
+  CLOSED: { label: 'Closed', className: 'returned' },
 }
+
+/** S25: a found item that may match a report, and who to contact about it. */
+export type MatchItem = PublicItem & { contact: string; score: number }
+
+export type ReportDetail = Report & {
+  matches: MatchItem[]
+  security_contact: string
+}
+
+export type AdminReport = Omit<Report, 'created_at' | 'status' | 'closed_at' | 'item'> & {
+  student: string
+}
+
+/** S13: a lost report that matches a found item, for the guard to check in person. */
+export type Candidate = AdminReport & { score: number }
 
 export type MyClaim = {
   id: number
@@ -98,7 +120,11 @@ export type AdminItemDetail = {
   claims: AdminClaim[]
   awaiting_pickup_by: string | null
   handover: Handover | null
-  suggestions: AdminReport[]
-  linked_reports: AdminReport[]
-  link_options: AdminReport[]
+  candidates: Candidate[]
+}
+
+/** S28: permanent admins come from ADMIN_EMAILS in .env; the rest were added in the app. */
+export type AdminList = {
+  permanent: string[]
+  added: { id: number; email: string; added_by: string; created_at: string }[]
 }

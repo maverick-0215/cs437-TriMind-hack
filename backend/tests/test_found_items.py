@@ -62,3 +62,35 @@ def test_S5_new_item_is_available(admin_client):
     response = admin_client.post("/api/admin/items", NEW_ITEM, format="multipart")
     assert response.json()["status"] == "AVAILABLE"
     assert FoundItem.objects.get().status == FoundItem.Status.AVAILABLE
+
+
+
+@pytest.mark.django_db
+def test_S31_future_dates_are_rejected(admin_client, student_client):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from lostfound.models import FoundItem, LostReport
+
+    today = timezone.localdate()
+    tomorrow = today + timedelta(days=1)
+    item = {"category": "Bag", "title": "Blue bag", "general_area": "Mess", "exact_location": "Gate", "description": "x"}
+    assert admin_client.post("/api/admin/items", {**item, "date_found": tomorrow}, format="multipart").status_code == 400
+    assert admin_client.post("/api/admin/items", {**item, "date_found": today}, format="multipart").status_code == 201
+    report = {"category": "Bag", "title": "Blue bag", "place_lost": "Mess", "private_details": "x"}
+    assert student_client.post("/api/reports", {**report, "date_lost": tomorrow}, format="json").status_code == 400
+    assert student_client.post("/api/reports", {**report, "date_lost": today}, format="json").status_code == 201
+    assert (FoundItem.objects.count(), LostReport.objects.count()) == (1, 1)
+
+
+
+@pytest.mark.django_db
+def test_S7_students_never_see_private_details(student_client, make_item, make_report, admin_client):
+    item = make_item()
+    report = make_report()
+    admin_client.post(f"/api/admin/items/{item.pk}/approve", {"report_id": report.pk}, format="json")
+    for url in ["/api/reports", f"/api/reports/{report.pk}", "/api/claims", "/api/notifications"]:
+        assert "SECRET" not in student_client.get(url).content.decode(), url
+    assert student_client.get(f"/api/admin/items/{item.pk}").status_code == 403
+    assert student_client.get(f"/api/admin/items/{item.pk}/photo").status_code == 403

@@ -106,3 +106,31 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ["-created_at", "-id"]
+
+
+class AdminEmail(models.Model):
+    """S28: an admin added from inside the app. Emails in ADMIN_EMAILS (.env) are admins too."""
+
+    email = models.EmailField(unique=True)
+    added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="admins_added")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["email"]
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+
+class PasswordCode(models.Model):
+    """S30: a one-time code emailed to set or reset a password. Only its hash is stored."""
+
+    email = models.EmailField(db_index=True)
+    code_hash = models.CharField(max_length=128)
+    created_at = models.DateTimeField(auto_now_add=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    used = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-created_at"]

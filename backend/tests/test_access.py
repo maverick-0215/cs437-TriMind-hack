@@ -98,10 +98,13 @@ def test_S3_student_gets_403_on_every_admin_route(student_client, url):
 
 
 def test_S3_admin_route_check_covers_all_admin_routes():
-    assert len(_api_urls("admin/")) == 9
+    assert len(_api_urls("admin/")) == 10
 
 
-OPEN_TO_VISITORS = {"/api/auth/config", "/api/auth/google", "/api/auth/dev-login", "/api/auth/logout"}
+OPEN_TO_VISITORS = {
+    "/api/auth/config", "/api/auth/google", "/api/auth/dev-login", "/api/auth/logout",
+    "/api/auth/login", "/api/auth/password/code", "/api/auth/password/reset",
+}
 
 
 @pytest.mark.django_db
@@ -116,11 +119,10 @@ def test_S23_logged_out_visitor_gets_401_everywhere_else(anon, make_item, url):
 
 
 @pytest.mark.django_db
-def test_S23_items_api_returns_401_after_logout(student_client, make_item):
-    make_item()
-    assert student_client.get("/api/items").status_code == 200
+def test_S23_api_returns_401_after_logout(student_client):
+    assert student_client.get("/api/reports").status_code == 200
     student_client.post("/api/auth/logout")
-    assert student_client.get("/api/items").status_code == 401
+    assert student_client.get("/api/reports").status_code == 401
 
 
 @pytest.mark.django_db
@@ -128,3 +130,25 @@ def test_S23_login_page_config_is_open(anon):
     response = anon.get("/api/auth/config")
     assert response.status_code == 200
     assert set(response.json()) == {"google_client_id", "dev_login"}
+
+
+@pytest.mark.django_db
+def test_S24_sign_in_option_must_match_role(anon, google):
+    def login(email, role):
+        return anon.post("/api/auth/google", {"credential": email, "role": role}, format="json")
+
+    assert login("asha@iitgn.ac.in", "admin").status_code == 403
+    assert login(ADMIN_EMAIL, "student").status_code == 403
+    assert _users() == set()
+    assert login("asha@iitgn.ac.in", "student").status_code == 200
+    anon.post("/api/auth/logout")
+    response = login(ADMIN_EMAIL, "admin")
+    assert response.status_code == 200 and response.json()["is_admin"] is True
+
+
+@pytest.mark.django_db
+def test_S24_dev_login_checks_role_too(anon, settings):
+    settings.DEV_LOGIN = True
+    post = lambda email, role: anon.post("/api/auth/dev-login", {"email": email, "role": role}, format="json")
+    assert post("asha@iitgn.ac.in", "admin").status_code == 403
+    assert post(ADMIN_EMAIL, "admin").status_code == 200
