@@ -1,4 +1,4 @@
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Navigate, useLocation } from 'react-router'
 import { api, useApi } from '../api'
 import { useAuth } from '../auth'
@@ -8,6 +8,9 @@ type AuthConfig = { google_client_id: string; dev_login: boolean }
 type Role = 'student' | 'admin'
 /** signin: email + password. code: ask for an emailed code, then set a new password (S30). */
 type Mode = 'signin' | 'code'
+
+/** Matches the backend: a new code can be asked for once a minute. */
+const RESEND_SECONDS = 60
 
 const ROLES: { role: Role; label: string }[] = [
   { role: 'student', label: 'Sign in as student' },
@@ -30,6 +33,18 @@ export default function LoginPage() {
   const [devEmail, setDevEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  // One code request at a time, then a short wait before asking again.
+  const [sending, setSending] = useState(false)
+  const [resendIn, setResendIn] = useState(0)
+  const [settingPassword, setSettingPassword] = useState(false)
+  // Shown under "Confirm new password" as soon as the two differ.
+  const passwordsDiffer = confirm.length > 0 && newPassword !== confirm
+
+  useEffect(() => {
+    if (resendIn <= 0) return
+    const tick = setTimeout(() => setResendIn((seconds) => seconds - 1), 1000)
+    return () => clearTimeout(tick)
+  }, [resendIn])
 
   const logIn = useCallback(
     async (path: string, body: object) => {
@@ -78,13 +93,18 @@ export default function LoginPage() {
 
   async function onSendCode(event?: FormEvent) {
     event?.preventDefault()
+    if (sending || resendIn > 0) return
     setError(null)
+    setSending(true)
     try {
       const result = await api<{ detail: string }>('auth/password/code', { method: 'POST', body: { email } })
       setCodeSent(true)
       setInfo(result.detail)
+      setResendIn(RESEND_SECONDS)
     } catch (e) {
       setError((e as Error).message)
+    } finally {
+      setSending(false)
     }
   }
 
@@ -95,14 +115,18 @@ export default function LoginPage() {
       setError('The two passwords do not match.')
       return
     }
+    setSettingPassword(true)
     try {
       const result = await api<{ detail: string }>('auth/password/reset', {
         method: 'POST',
-        body: { email, code, password: newPassword },
+        body: { email, code, password: newPassword, password_confirm: confirm },
       })
+      // Back to sign in, with the email already filled in.
       backToSignIn(result.detail)
     } catch (e) {
       setError((e as Error).message)
+    } finally {
+      setSettingPassword(false)
     }
   }
 
@@ -220,7 +244,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </label>
-                <button>Send code</button>
+                <button disabled={sending}>{sending ? 'Sending…' : 'Send code'}</button>
               </form>
             ) : (
               <form className="stack" onSubmit={onSetPassword}>
@@ -233,7 +257,8 @@ export default function LoginPage() {
                     maxLength={6}
                     autoComplete="one-time-code"
                     value={code}
-                    onChange={(e) => setCode(e.target.value)}
+                    // Pasted codes often carry spaces; keep only the digits.
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   />
                 </label>
                 <label>
@@ -256,11 +281,26 @@ export default function LoginPage() {
                     autoComplete="new-password"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
+                    aria-invalid={passwordsDiffer}
                   />
+                  {passwordsDiffer && <small className="field-error">The two passwords do not match.</small>}
                 </label>
-                <button>Set password</button>
-                <button type="button" className="link" onClick={() => onSendCode()}>
-                  Didn't get it? Send a new code
+                {/* Errors from the server (wrong code, weak password) right where the user is looking. */}
+                {error && <p className="error">{error}</p>}
+                <button disabled={settingPassword || passwordsDiffer || !confirm}>
+                  {settingPassword ? 'Setting password…' : 'Set password'}
+                </button>
+                <button
+                  type="button"
+                  className="link"
+                  disabled={sending || resendIn > 0}
+                  onClick={() => onSendCode()}
+                >
+                  {sending
+                    ? 'Sending…'
+                    : resendIn > 0
+                      ? `Didn't get it? You can ask for a new code in ${resendIn}s`
+                      : "Didn't get it? Send a new code"}
                 </button>
               </form>
             )}
@@ -273,7 +313,8 @@ export default function LoginPage() {
         )}
 
         {info && <p className="info">{info}</p>}
-        {error && <p className="error">{error}</p>}
+        {/* The set-password form shows its own errors above its button. */}
+        {error && !(mode === 'code' && codeSent) && <p className="error">{error}</p>}
       </div>
       <p className="login-note">Run by the Security Office, IIT Gandhinagar</p>
     </main>

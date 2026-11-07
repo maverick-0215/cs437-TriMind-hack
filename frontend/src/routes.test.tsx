@@ -104,7 +104,7 @@ describe('S29, S30: password sign-in and forgot password', () => {
       if (url === '/api/auth/config') return json({ google_client_id: '', dev_login: false })
       if (url === '/api/auth/login') return json({ detail: 'Wrong email or password.' }, 400)
       if (url === '/api/auth/password/code') return json({ detail: 'We sent a 6-digit code to asha@iitgn.ac.in.' })
-      if (url === '/api/auth/password/reset') return json({ detail: 'Password set. You can sign in now.' })
+      if (url === '/api/auth/password/reset') return json({ detail: 'Password set. Sign in with your new password.' })
       return json([])
     })
     renderAt('/login')
@@ -120,11 +120,17 @@ describe('S29, S30: password sign-in and forgot password', () => {
     fireEvent.change(screen.getByLabelText(/^New password/), { target: { value: 'lantern-violet-42' } })
     fireEvent.change(screen.getByLabelText('Confirm new password'), { target: { value: 'lantern-violet-42' } })
     fireEvent.click(screen.getByText('Set password'))
-    expect(await screen.findByText('Password set. You can sign in now.')).toBeTruthy()
+    expect(await screen.findByText('Password set. Sign in with your new password.')).toBeTruthy()
+    // Back on the sign-in form, with the email already filled in.
+    expect((screen.getByLabelText('Email') as HTMLInputElement).value).toBe('asha@iitgn.ac.in')
+    expect(screen.getByLabelText('Password')).toBeTruthy()
     expect(calls).toEqual([
       ['/api/auth/login', { email: 'asha@iitgn.ac.in', password: 'wrong', role: 'student' }],
       ['/api/auth/password/code', { email: 'asha@iitgn.ac.in' }],
-      ['/api/auth/password/reset', { email: 'asha@iitgn.ac.in', code: '123456', password: 'lantern-violet-42' }],
+      [
+        '/api/auth/password/reset',
+        { email: 'asha@iitgn.ac.in', code: '123456', password: 'lantern-violet-42', password_confirm: 'lantern-violet-42' },
+      ],
     ])
   })
 })
@@ -144,4 +150,54 @@ describe('guide comes first', () => {
     expect(await screen.findByText('For the security office')).toBeTruthy()
     expect(screen.getByText('Check the person, then approve')).toBeTruthy()
   })
+})
+
+it('sends only one code request however often the button is clicked', async () => {
+  let codeRequests = 0
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json({ detail: 'Not logged in.' }, 401)
+    if (url === '/api/auth/config') return json({ google_client_id: '', dev_login: false })
+    if (url === '/api/auth/password/code') {
+      codeRequests += 1
+      return json({ detail: 'We sent a 6-digit code to asha@iitgn.ac.in.' })
+    }
+    return json([])
+  })
+  renderAt('/login')
+  fireEvent.click(await screen.findByText('Forgot password?'))
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'asha@iitgn.ac.in' } })
+  const send = screen.getByText('Send code')
+  fireEvent.click(send)
+  fireEvent.click(send)
+  fireEvent.click(send)
+  expect(await screen.findByText(/We sent a 6-digit code/)).toBeTruthy()
+  // The resend link waits a minute before it can be used.
+  const resend = screen.getByText(/You can ask for a new code in \d+s/)
+  fireEvent.click(resend)
+  expect(codeRequests).toBe(1)
+})
+
+it('will not set a password until both boxes match, and ignores spaces in the code', async () => {
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json({ detail: 'Not logged in.' }, 401)
+    if (url === '/api/auth/config') return json({ google_client_id: '', dev_login: false })
+    if (url === '/api/auth/password/code') return json({ detail: 'We sent a 6-digit code.' })
+    return json([])
+  })
+  renderAt('/login')
+  fireEvent.click(await screen.findByText('Forgot password?'))
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'asha@iitgn.ac.in' } })
+  fireEvent.click(screen.getByText('Send code'))
+  const codeBox = (await screen.findByLabelText('Code from your email')) as HTMLInputElement
+  fireEvent.change(codeBox, { target: { value: ' 123 456 ' } })
+  expect(codeBox.value).toBe('123456')
+  fireEvent.change(screen.getByLabelText(/^New password/), { target: { value: 'lantern-violet-42' } })
+  fireEvent.change(screen.getByLabelText(/^Confirm new password/), { target: { value: 'lantern-violet-4' } })
+  expect(screen.getByText('The two passwords do not match.')).toBeTruthy()
+  expect((screen.getByText('Set password') as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.change(screen.getByLabelText(/^Confirm new password/), { target: { value: 'lantern-violet-42' } })
+  expect(screen.queryByText('The two passwords do not match.')).toBeNull()
+  expect((screen.getByText('Set password') as HTMLButtonElement).disabled).toBe(false)
 })

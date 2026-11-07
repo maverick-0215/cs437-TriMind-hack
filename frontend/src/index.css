@@ -486,6 +486,26 @@ button.link {
   padding: 0;
   font-weight: 400;
 }
+/* A request is in progress, or the button is waiting (e.g. before a new code). */
+button:disabled,
+button:disabled:hover {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+button.link:disabled,
+button.link:disabled:hover {
+  color: var(--muted);
+  text-decoration: none;
+  opacity: 1;
+}
+/* A problem with one field, shown right under it. */
+.field-error {
+  color: var(--err);
+  font-weight: 600;
+}
+input[aria-invalid='true'] {
+  border-color: var(--err);
+}
 button.link:hover {
   background: none;
   color: var(--accent-hover);
