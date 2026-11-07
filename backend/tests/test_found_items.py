@@ -122,3 +122,25 @@ def test_S32_double_submitted_found_item_is_saved_once(admin_client, make_report
     FoundItem.objects.update(created_at=timezone.now() - timedelta(minutes=3))
     assert admin_client.post("/api/admin/items", item, format="multipart").status_code == 201
     assert FoundItem.objects.count() == 3
+
+
+@pytest.mark.django_db
+def test_S6_found_items_list_shows_what_where_and_who(student_client, make_item, admin_user):
+    from datetime import date
+
+    from lostfound.models import FoundItem
+
+    make_item(title="Older umbrella", category="Umbrella", date_found=date(2026, 10, 1), general_area="Library")
+    make_item(title="Newer bottle", category="Bottle", date_found=date(2026, 10, 9), general_area="Mess")
+    make_item(title="Waiting for pickup", status=FoundItem.Status.CLAIMED)
+    make_item(title="Already returned", status=FoundItem.Status.RETURNED)
+
+    body = student_client.get("/api/items").json()
+    assert [i["title"] for i in body["items"]] == ["Newer bottle", "Older umbrella"]
+    first = body["items"][0]
+    assert (first["category"], first["date_found"], first["general_area"]) == ("Bottle", "2026-10-09", "Mess")
+    assert first["contact"] == admin_user.email
+    assert body["security_contact"]
+    # S7: public fields only.
+    assert set(first) == {"id", "category", "title", "date_found", "general_area", "contact"}
+    assert "SECRET" not in str(body)

@@ -33,6 +33,18 @@ def _error(exc, code=status.HTTP_409_CONFLICT):
 
 
 @api_view(["GET"])
+def items(request):
+    """S6: every found item at the security office, with where it was found and who to
+    contact. Public fields only (S7)."""
+    return Response(
+        {
+            "items": MatchItemSerializer(services.available_items(), many=True).data,
+            "security_contact": settings.SECURITY_CONTACT,
+        }
+    )
+
+
+@api_view(["GET"])
 def notifications(request):
     return Response(NotificationSerializer(request.user.notifications.all(), many=True).data)
 

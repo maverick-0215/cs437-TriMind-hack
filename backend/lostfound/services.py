@@ -96,6 +96,13 @@ def match_score(report, item):
     return round(min(score, 100))
 
 
+def available_items():
+    """S6: every found item still at the security office, newest first."""
+    return FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).select_related("added_by").order_by(
+        "-date_found", "-created_at"
+    )
+
+
 def matching_items(report):
     """S25: AVAILABLE items matching the report by at least MATCH_THRESHOLD, best first."""
     items = FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).select_related("added_by")

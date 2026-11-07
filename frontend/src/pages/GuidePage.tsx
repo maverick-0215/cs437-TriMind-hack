@@ -128,6 +128,9 @@ export default function GuidePage() {
             <li>
               Watch <Link to="/notifications">Notifications</Link>: that's where matches and approvals show up.
             </li>
+            <li>
+              Browse everything currently at the security office on <Link to="/found">Found items</Link>.
+            </li>
             <li>The more specific your title and place, the better the matches.</li>
             <li>Never share your pickup code with anyone except the guard handing over your item.</li>
           </>

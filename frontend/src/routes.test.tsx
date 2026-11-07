@@ -202,6 +202,21 @@ it('will not set a password until both boxes match, and ignores spaces in the co
   expect((screen.getByText('Set password') as HTMLButtonElement).disabled).toBe(false)
 })
 
+const SAVED_REPORT = {
+  id: 7,
+  category: 'Bag',
+  title: 'Blue bag',
+  date_lost: '2026-10-05',
+  place_lost: 'Mess',
+  private_details: 'Name tag',
+  created_at: '2026-10-05T10:00:00Z',
+  status: 'OPEN',
+  closed_at: null,
+  item: null,
+  matches: [],
+  security_contact: 'Security Office, Main Gate',
+}
+
 it('S32: files a lost report only once however often the button is clicked', async () => {
   let posts = 0
   vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
@@ -211,6 +226,8 @@ it('S32: files a lost report only once however often the button is clicked', asy
       posts += 1
       return json({ id: 7 }, 201)
     }
+    // After saving, the app opens the new report: answer like the real server does.
+    if (url === '/api/reports/7') return json(SAVED_REPORT)
     return json([])
   })
   renderAt('/reports/new')
@@ -219,7 +236,27 @@ it('S32: files a lost report only once however often the button is clicked', asy
   fireEvent.submit(form)
   fireEvent.submit(form)
   fireEvent.submit(form)
-  await screen.findByText('Saving…').catch(() => null)
-  await new Promise((resolve) => setTimeout(resolve, 0))
+  // Wait until the saved report's page has fully loaded, so nothing is left running.
+  expect(await screen.findByRole('heading', { name: /Blue bag/ })).toBeTruthy()
   expect(posts).toBe(1)
+})
+
+it('S6: students see every found item with where it was found and who to contact', async () => {
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json(STUDENT)
+    if (url === '/api/items')
+      return json({
+        items: [
+          { id: 1, category: 'Bottle', title: 'Steel bottle', date_found: '2026-10-09', general_area: 'Mess', contact: 'guard@iitgn.ac.in' },
+        ],
+        security_contact: 'Security Office, Main Gate',
+      })
+    return json([])
+  })
+  renderAt('/found')
+  expect(await screen.findByText('Steel bottle')).toBeTruthy()
+  expect(screen.getByText('Mess')).toBeTruthy()
+  expect(screen.getByText('guard@iitgn.ac.in')).toBeTruthy()
+  expect(screen.getByRole('link', { name: 'Found items' })).toBeTruthy()
 })
