@@ -15,24 +15,44 @@ export default function AdminItemPage() {
   const { data, error, reload } = useApi<AdminItemDetail>(`admin/items/${id}`)
   const [actionError, setActionError] = useState<string | null>(null)
   const [handoverError, setHandoverError] = useState<string | null>(null)
+  // What just happened, e.g. who was emailed their pickup code.
+  const [notice, setNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
 
-  async function act(path: string, body?: object, setError = setActionError) {
+  async function act(path: string, body?: object, setError = setActionError): Promise<boolean> {
+    if (busy) return false
+    setBusy(true)
     setError(null)
+    setNotice(null)
     try {
       await api(path, { method: 'POST', body })
       reload()
+      return true
     } catch (e) {
       setError((e as Error).message)
+      return false
+    } finally {
+      setBusy(false)
     }
   }
 
-  function approve(who: { report_id: number } | { email: string }) {
-    act(`admin/items/${id}/approve`, who)
+  async function approve(who: { report_id: number } | { email: string }, email: string) {
+    if (await act(`admin/items/${id}/approve`, who)) {
+      // S17: the code goes to the student's inbox, never to the admin.
+      setNotice(`Approved. We emailed ${email} their pickup code. Ask them for it at handover.`)
+    }
+  }
+
+  async function cancel(claimId: number, email: string) {
+    if (await act(`admin/claims/${claimId}/cancel`)) {
+      setNotice(`Approval cancelled. We emailed ${email} to let them know.`)
+    }
   }
 
   function onApproveEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    approve({ email: String(new FormData(event.currentTarget).get('email')) })
+    const email = String(new FormData(event.currentTarget).get('email')).trim().toLowerCase()
+    approve({ email }, email)
   }
 
   function onHandover(event: FormEvent<HTMLFormElement>) {
@@ -49,7 +69,9 @@ export default function AdminItemPage() {
       <h1>
         {item.title} <span className={`status ${item.status.toLowerCase()}`}>{item.status.toLowerCase()}</span>
       </h1>
-      {actionError && <p className="error">{actionError}</p>}
+      {/* While the approve form is open, its errors show under it instead (where the guard is looking). */}
+      {actionError && item.status !== 'AVAILABLE' && <p className="error">{actionError}</p>}
+      {notice && <p className="info">{notice}</p>}
 
       <div className="item-grid">
         <dl className="card details">
@@ -93,15 +115,19 @@ export default function AdminItemPage() {
                 {r.title} · {r.category} · lost {formatDate(r.date_lost)} at {r.place_lost}
               </p>
               <p className="pre">{r.private_details}</p>
-              <button onClick={() => approve({ report_id: r.id })}>Approve {r.student}</button>
+              <button disabled={busy} onClick={() => approve({ report_id: r.id }, r.student)}>
+                Approve {r.student}
+              </button>
             </div>
           ))}
 
           <h3>Approve someone else</h3>
           <form className="row" onSubmit={onApproveEmail}>
             <input name="email" type="email" required placeholder="name@iitgn.ac.in" aria-label="Email to approve" />
-            <button>Approve</button>
+            <button disabled={busy}>Approve</button>
           </form>
+          <p className="muted">They get their pickup code by email straight away, even if they have never signed in.</p>
+          {actionError && <p className="error">Not approved: {actionError}</p>}
         </>
       )}
 
@@ -137,7 +163,7 @@ export default function AdminItemPage() {
                 </span>
               </p>
               {c.status === 'APPROVED' && data.awaiting_pickup_by === c.student && (
-                <button className="secondary" onClick={() => act(`admin/claims/${c.id}/cancel`)}>
+                <button className="secondary" disabled={busy} onClick={() => cancel(c.id, c.student)}>
                   Cancel approval
                 </button>
               )}

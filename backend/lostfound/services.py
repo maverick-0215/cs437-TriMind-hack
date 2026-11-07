@@ -1,12 +1,17 @@
+import logging
 import re
 import secrets
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db import transaction
 from django.utils import timezone
 
 from .models import Claim, FoundItem, Handover, LostReport, Notification
+
+logger = logging.getLogger(__name__)
 
 
 class ClaimError(Exception):
@@ -19,6 +24,20 @@ def _six_digit_code():
 
 def notify(user, message, link=""):
     Notification.objects.create(user=user, message=message, link=link)
+
+
+def email_after_save(user, subject, body):
+    """Email someone once the current transaction is saved. Sending waits for the mail server,
+    so it must not hold the database open, and it must not go out for a change that was
+    rolled back. A failed email is logged; the change itself stays."""
+
+    def send():
+        try:
+            send_mail(subject, body, None, [user.email])
+        except OSError:
+            logger.exception("Could not send %r to %s", subject, user.email)
+
+    transaction.on_commit(send)
 
 
 # --- Duplicate submissions (S32) ---
@@ -164,6 +183,17 @@ def approve_owner(item, student, admin, report=None):
         f'You were approved to collect "{item.title}". Your pickup code is on Pickup codes. Tell it to the guard.',
         "/claims",
     )
+    # S17: the code also goes to the student's own inbox, so someone approved by email who has
+    # not signed in yet still gets it. Never to admins, never in a notification.
+    email_after_save(
+        student,
+        f'Your pickup code for "{item.title}"',
+        f'You have been approved to collect "{item.title}" from the IITGN security office.\n\n'
+        f"Your pickup code: {claim.pickup_code}\n\n"
+        "Tell this code to the guard when you collect the item. It works only once.\n"
+        f"You can also see it on the Pickup codes page: {settings.SITE_URL}/claims\n\n"
+        "If you did not lose this item, ignore this email.",
+    )
     return claim
 
 
@@ -182,6 +212,13 @@ def cancel_approval(claim, admin):
     # S27: the report is open again.
     LostReport.objects.filter(linked_item=claim.item, student=claim.student).update(linked_item=None)
     notify(claim.student, f'Your approval to collect "{claim.item.title}" was cancelled.', "/claims")
+    email_after_save(
+        claim.student,
+        f'Approval cancelled for "{claim.item.title}"',
+        f'The security office cancelled your approval to collect "{claim.item.title}". '
+        "The pickup code you were sent no longer works.\n\n"
+        "If you think this is a mistake, contact the security office.",
+    )
 
 
 @transaction.atomic

@@ -1,5 +1,7 @@
 import pytest
 
+from django.core import mail
+
 from lostfound.models import Claim, FoundItem, Handover, Notification
 
 from .conftest import ADMIN_EMAIL
@@ -180,3 +182,57 @@ def test_S27_cancelling_reopens_report_and_closed_reports_stop_matching(
     other = make_item(title="Black phone again")
     assert admin_client.get(f"/api/admin/items/{other.pk}").json()["candidates"] == []
     assert _approve(admin_client, other, report_id=report.pk).status_code == 409
+
+
+@pytest.mark.django_db
+def test_S17_pickup_code_is_emailed_only_to_that_student(
+    make_item, make_report, admin_client, student, admin_user, django_capture_on_commit_callbacks
+):
+    item, report = make_item(), make_report()
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        _approve(admin_client, item, report_id=report.pk)
+    assert len(mail.outbox) == 1
+    message = mail.outbox[0]
+    assert message.to == [student.email]
+    assert CODE in message.body and "Black phone" in message.subject
+    assert admin_user.email not in message.to + message.cc + message.bcc
+
+
+@pytest.mark.django_db
+def test_S17_person_approved_by_email_gets_the_code_without_signing_in(
+    make_item, admin_client, django_capture_on_commit_callbacks
+):
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert _approve(admin_client, make_item(), email="walk.in@iitgn.ac.in").status_code == 204
+    assert [m.to for m in mail.outbox] == [["walk.in@iitgn.ac.in"]]
+    assert CODE in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_S17_approval_stands_even_if_the_email_fails(
+    make_item, make_report, admin_client, student_client, monkeypatch, django_capture_on_commit_callbacks
+):
+    import smtplib
+
+    def broken(*args, **kwargs):
+        raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+
+    monkeypatch.setattr("lostfound.services.send_mail", broken)
+    item = make_item()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert _approve(admin_client, item, report_id=make_report().pk).status_code == 204
+    item.refresh_from_db()
+    assert item.status == FoundItem.Status.CLAIMED
+    assert student_client.get("/api/claims").json()[0]["pickup_code"] == CODE
+
+
+@pytest.mark.django_db
+def test_S18_cancelled_approval_is_emailed(approved_item, admin_client, student, django_capture_on_commit_callbacks):
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        admin_client.post(f"/api/admin/claims/{approved_item.claims.get().pk}/cancel")
+    assert [m.to for m in mail.outbox] == [[student.email]]
+    assert "cancelled" in mail.outbox[0].subject.lower()
+    assert CODE not in mail.outbox[0].body

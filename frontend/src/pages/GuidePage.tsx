@@ -39,8 +39,8 @@ const STUDENT_STEPS: Step[] = [
     title: 'Collect it with your pickup code',
     body: (
       <>
-        After approval, a 6-digit code appears on <Link to="/claims">Pickup codes</Link>. Tell it to the guard and take
-        your item. Your lost report then shows <strong>Closed</strong>.
+        After approval, you get a 6-digit pickup code by email, and it also appears on{' '}
+        <Link to="/claims">Pickup codes</Link>. Tell it to the guard and take your item. Your lost report then shows <strong>Closed</strong>.
       </>
     ),
   },
@@ -81,7 +81,7 @@ const ADMIN_STEPS: Step[] = [
     title: 'Hand over with the pickup code',
     body: (
       <>
-        The student gets a 6-digit code in the app. Ask them for it and enter it under <strong>Hand over</strong>. The
+        The student gets a 6-digit code by email and in the app. Ask them for it and enter it under <strong>Hand over</strong>. The
         item is marked returned and logged on <Link to="/admin/handovers">Handovers</Link>.
       </>
     ),

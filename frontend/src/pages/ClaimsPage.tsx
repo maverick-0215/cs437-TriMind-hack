@@ -14,8 +14,8 @@ export default function ClaimsPage() {
     <>
       <h1>Pickup codes</h1>
       <p className="muted">
-        When the security office checks you and approves you for an item, your pickup code appears here. Tell it to the
-        guard to collect the item.
+        When the security office checks you and approves you for an item, your pickup code appears here, and we email
+        it to you too. Tell it to the guard to collect the item.
       </p>
       {error && <p className="error">{error}</p>}
       {claims?.length === 0 && <p className="empty">No pickup codes yet.</p>}

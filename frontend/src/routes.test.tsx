@@ -260,3 +260,49 @@ it('S6: students see every found item with where it was found and who to contact
   expect(screen.getByText('guard@iitgn.ac.in')).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Found items' })).toBeTruthy()
 })
+
+it('S17: after approving someone, the guard is told their pickup code was emailed to them', async () => {
+  const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
+  const detail = {
+    item: {
+      id: 1, category: 'Bag', title: 'Blue bag', date_found: '2026-10-06', general_area: 'Mess',
+      exact_location: 'Counter', description: 'Zip pocket', has_photo: false, status: 'AVAILABLE',
+      added_by: 'guard@iitgn.ac.in', created_at: '2026-10-06T10:00:00Z',
+    },
+    claims: [], awaiting_pickup_by: null, handover: null, candidates: [],
+  }
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json(ADMIN)
+    if (url === '/api/admin/items/1/approve') return new Response(null, { status: 204 })
+    if (url === '/api/admin/items/1') return json(detail)
+    return json([])
+  })
+  renderAt('/admin/items/1')
+  fireEvent.change(await screen.findByLabelText('Email to approve'), { target: { value: 'Walk.In@iitgn.ac.in' } })
+  fireEvent.click(screen.getByText('Approve'))
+  expect(await screen.findByText(/We emailed walk.in@iitgn.ac.in their pickup code/)).toBeTruthy()
+})
+
+it('S16: a refused approval is explained right under the Approve box', async () => {
+  const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
+  const detail = {
+    item: {
+      id: 1, category: 'Bag', title: 'Blue bag', date_found: '2026-10-06', general_area: 'Mess',
+      exact_location: 'Counter', description: 'Zip pocket', has_photo: false, status: 'AVAILABLE',
+      added_by: 'guard@iitgn.ac.in', created_at: '2026-10-06T10:00:00Z',
+    },
+    claims: [], awaiting_pickup_by: null, handover: null, candidates: [],
+  }
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json(ADMIN)
+    if (url === '/api/admin/items/1/approve') return json({ detail: 'Security office accounts cannot collect items.' }, 400)
+    if (url === '/api/admin/items/1') return json(detail)
+    return json([])
+  })
+  renderAt('/admin/items/1')
+  fireEvent.change(await screen.findByLabelText('Email to approve'), { target: { value: 'amisha@iitgn.ac.in' } })
+  fireEvent.click(screen.getByText('Approve'))
+  expect(await screen.findByText('Not approved: Security office accounts cannot collect items.')).toBeTruthy()
+})
