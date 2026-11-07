@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import status
@@ -32,6 +33,18 @@ def _error(exc, code=status.HTTP_409_CONFLICT):
 
 
 @api_view(["GET"])
+def items(request):
+    """S6: every found item at the security office, with where it was found and who to
+    contact. Public fields only (S7)."""
+    return Response(
+        {
+            "items": MatchItemSerializer(services.available_items(), many=True).data,
+            "security_contact": settings.SECURITY_CONTACT,
+        }
+    )
+
+
+@api_view(["GET"])
 def notifications(request):
     return Response(NotificationSerializer(request.user.notifications.all(), many=True).data)
 
@@ -51,7 +64,12 @@ def reports(request):
     if request.method == "POST":
         serializer = ReportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(student=request.user)
+        with transaction.atomic():
+            services.lock_user(request.user)
+            # S32: sent twice by mistake? Return the report already saved instead of a copy.
+            if existing := services.recent_duplicate_report(request.user, serializer.validated_data):
+                return Response(ReportSerializer(existing).data, status=status.HTTP_200_OK)
+            serializer.save(student=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     # S12: only the student's own reports.
     return Response(ReportSerializer(request.user.lost_reports.select_related("linked_item__handover"), many=True).data)
@@ -90,7 +108,12 @@ def admin_items(request):
     if request.method == "POST":
         serializer = AdminItemSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        item = serializer.save(added_by=request.user)  # S5: status defaults to AVAILABLE
+        with transaction.atomic():
+            services.lock_user(request.user)
+            # S32: sent twice by mistake? Return the item already saved, and notify no one again.
+            if existing := services.recent_duplicate_item(request.user, serializer.validated_data):
+                return Response(AdminItemSerializer(existing).data, status=status.HTTP_200_OK)
+            item = serializer.save(added_by=request.user)  # S5: status defaults to AVAILABLE
         services.notify_matching_reports(item)  # S26
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(AdminItemSerializer(FoundItem.objects.select_related("added_by"), many=True).data)

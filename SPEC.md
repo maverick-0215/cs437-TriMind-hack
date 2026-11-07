@@ -23,14 +23,16 @@ Each statement has at least one automated test that names its ID.
 - **S24.** The login page has two options, "Sign in as student" and "Sign in as admin". Choosing admin with an email not in `ADMIN_EMAILS` is rejected, and an admin email is rejected on the student option. The choice never grants a role.
 - **S28.** An admin can add another `@iitgn.ac.in` email as an admin, and remove admins added this way, except themselves. Emails in `ADMIN_EMAILS` are permanent admins and can only be changed in `.env`.
 - **S29.** A user can sign in with their `@iitgn.ac.in` email and password (on the student or admin option, S24). A wrong password gets the same message whether or not the account exists, and after 5 wrong passwords that email is locked for 15 minutes.
-- **S30.** A user who forgot their password, or has none yet, asks for a code. A random 6-digit code is emailed to them; only its hash is stored. Entering it with a new password sets the password, creating the account if needed. A code works once, for 10 minutes, for at most 5 tries, and asking again replaces the old code. New passwords must pass Django's password rules. The new password must be typed twice and match. After it is set, the user is emailed a confirmation, and the password stays set even if that email fails.
+- **S30.** A user who forgot their password, or has none yet, asks for a code. A random 6-digit code is emailed to them; only its hash is stored. Entering it with a new password sets the password, creating the account if needed. A code works for 10 minutes. Because emails can arrive late, the three most recent codes all work, and once one is used every code for that email is spent. Five wrong tries within 10 minutes block codes for that email. New passwords must pass Django's password rules. The new password must be typed twice and match. After it is set, the user is emailed a confirmation, and the password stays set even if that email fails.
 
 ### Found items
 
 - **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo.
 - **S5.** A new found item has status `AVAILABLE`.
+- **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact.
 - **S7.** Students never see a found item's private details (exact location, description, photo) anywhere in the app or its API.
 - **S31.** The date found and the date lost cannot be after today. The date pickers do not offer future dates, and the API rejects them.
+- **S32.** Sending the same lost report or found item again within 2 minutes (a double click, or a retry on a slow connection) does not create a copy. The one already saved is returned, and nobody is notified twice. The form's button is disabled while it saves.
 
 ### Lost reports
 

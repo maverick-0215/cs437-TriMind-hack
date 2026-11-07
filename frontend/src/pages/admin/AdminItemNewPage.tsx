@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../../api'
 import { todayISO } from '../../format'
@@ -7,9 +7,16 @@ import { CATEGORIES, type AdminItem } from '../../types'
 export default function AdminItemNewPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  // S32: one save at a time. The ref blocks a second click instantly, before React re-renders.
+  const saving = useRef(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving.current) return
+    saving.current = true
+    setIsSaving(true)
+    setError(null)
     const form = new FormData(event.currentTarget)
     if (!(form.get('photo') as File).size) form.delete('photo')
     try {
@@ -18,6 +25,8 @@ export default function AdminItemNewPage() {
       navigate(`/admin/items/${item.id}`)
     } catch (e) {
       setError((e as Error).message)
+      saving.current = false
+      setIsSaving(false)
     }
   }
 
@@ -63,7 +72,7 @@ export default function AdminItemNewPage() {
           <input name="photo" type="file" accept="image/*" />
         </label>
         {error && <p className="error">{error}</p>}
-        <button>Add item</button>
+        <button disabled={isSaving}>{isSaving ? 'Saving…' : 'Add item'}</button>
       </form>
     </section>
   )

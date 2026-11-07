@@ -62,9 +62,31 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": DATA_DIR / "db.sqlite3",
-        # Wait up to 20 s for a busy database instead of the default 5 s. Azure keeps
-        # /home on network storage, where SQLite's locks are slower.
-        "OPTIONS": {"timeout": 20},
+        "OPTIONS": {
+            # Wait up to 20 s for a busy database instead of the default 5 s. Azure keeps
+            # /home on network storage, where SQLite's locks are slower.
+            "timeout": 20,
+            # Take the write lock when a transaction starts, so simultaneous writers queue
+            # up instead of failing with "database is locked" halfway through.
+            "transaction_mode": "IMMEDIATE",
+        },
+    }
+}
+
+# Optional: a real database server such as Azure Database for PostgreSQL, e.g.
+# DATABASE_URL=postgres://user:password@host:5432/lostfound?sslmode=require
+# Without it, the SQLite file above is used.
+if DATABASE_URL := os.environ.get("DATABASE_URL"):
+    import dj_database_url
+
+    DATABASES["default"] = dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)
+
+# Shared by every server process (unlike the default per-process memory cache), so the
+# wrong-password lockout (S29) counts tries from all of them. Created by startup.sh.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "django_cache",
     }
 }
 
@@ -90,6 +112,8 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # Browsers remember to always use https for this site (HSTS), for a year.
+    SECURE_HSTS_SECONDS = 31536000
 
 # Send warnings and errors to the console, so they show in Azure's log stream.
 LOGGING = {

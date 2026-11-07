@@ -7,6 +7,7 @@ import AdminHandoversPage from './pages/admin/AdminHandoversPage'
 import AdminItemNewPage from './pages/admin/AdminItemNewPage'
 import AdminItemPage from './pages/admin/AdminItemPage'
 import ClaimsPage from './pages/ClaimsPage'
+import FoundItemsPage from './pages/FoundItemsPage'
 import GuidePage from './pages/GuidePage'
 import LoginPage from './pages/LoginPage'
 import NotificationsPage from './pages/NotificationsPage'
@@ -30,6 +31,7 @@ export function AppRoutes() {
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="guide" element={<GuidePage />} />
             <Route element={<RequireStudent />}>
+              <Route path="found" element={<FoundItemsPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="reports/new" element={<ReportNewPage />} />
               <Route path="reports/:id" element={<ReportDetailPage />} />

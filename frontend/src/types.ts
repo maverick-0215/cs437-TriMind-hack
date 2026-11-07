@@ -128,3 +128,9 @@ export type AdminList = {
   permanent: string[]
   added: { id: number; email: string; added_by: string; created_at: string }[]
 }
+
+/** S6: the students' list of found items. */
+export type FoundList = {
+  items: (PublicItem & { contact: string })[]
+  security_contact: string
+}

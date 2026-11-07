@@ -38,6 +38,7 @@ export default function Layout() {
               </>
             ) : (
               <>
+                <NavLink to="/found">Found items</NavLink>
                 <NavLink to="/reports">My lost reports</NavLink>
                 <NavLink to="/claims">Pickup codes</NavLink>
               </>

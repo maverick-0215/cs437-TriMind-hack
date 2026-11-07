@@ -16,6 +16,7 @@ urlpatterns = [
     path("reports", views.reports),
     path("reports/<int:pk>", views.report_detail),
     path("claims", views.my_claims),
+    path("items", views.items),
     path("notifications", views.notifications),
     path("notifications/read", views.notifications_read),
     # Admin only (S3). Every route under admin/ must use IsAdmin.

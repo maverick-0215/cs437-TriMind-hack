@@ -94,3 +94,53 @@ def test_S7_students_never_see_private_details(student_client, make_item, make_r
         assert "SECRET" not in student_client.get(url).content.decode(), url
     assert student_client.get(f"/api/admin/items/{item.pk}").status_code == 403
     assert student_client.get(f"/api/admin/items/{item.pk}/photo").status_code == 403
+
+
+
+@pytest.mark.django_db
+def test_S32_double_submitted_found_item_is_saved_once(admin_client, make_report):
+    from datetime import date, timedelta
+
+    from django.utils import timezone
+
+    from lostfound.models import FoundItem, Notification
+
+    make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 9))
+    item = {
+        "category": "Electronics", "title": "Black phone", "date_found": "2026-10-10",
+        "general_area": "Library", "exact_location": "Desk 14", "description": "Samsung",
+    }
+    first = admin_client.post("/api/admin/items", item, format="multipart")
+    again = admin_client.post("/api/admin/items", item, format="multipart")
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert again.json()["id"] == first.json()["id"]
+    assert FoundItem.objects.count() == 1
+    assert Notification.objects.count() == 1  # the student is not told twice
+
+    # A different item, or the same one added later, is a real new item.
+    assert admin_client.post("/api/admin/items", {**item, "title": "Blue phone"}, format="multipart").status_code == 201
+    FoundItem.objects.update(created_at=timezone.now() - timedelta(minutes=3))
+    assert admin_client.post("/api/admin/items", item, format="multipart").status_code == 201
+    assert FoundItem.objects.count() == 3
+
+
+@pytest.mark.django_db
+def test_S6_found_items_list_shows_what_where_and_who(student_client, make_item, admin_user):
+    from datetime import date
+
+    from lostfound.models import FoundItem
+
+    make_item(title="Older umbrella", category="Umbrella", date_found=date(2026, 10, 1), general_area="Library")
+    make_item(title="Newer bottle", category="Bottle", date_found=date(2026, 10, 9), general_area="Mess")
+    make_item(title="Waiting for pickup", status=FoundItem.Status.CLAIMED)
+    make_item(title="Already returned", status=FoundItem.Status.RETURNED)
+
+    body = student_client.get("/api/items").json()
+    assert [i["title"] for i in body["items"]] == ["Newer bottle", "Older umbrella"]
+    first = body["items"][0]
+    assert (first["category"], first["date_found"], first["general_area"]) == ("Bottle", "2026-10-09", "Mess")
+    assert first["contact"] == admin_user.email
+    assert body["security_contact"]
+    # S7: public fields only.
+    assert set(first) == {"id", "category", "title", "date_found", "general_area", "contact"}
+    assert "SECRET" not in str(body)
