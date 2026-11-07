@@ -133,3 +133,60 @@ def test_S30_failed_email_is_reported_and_nothing_is_kept(anon, settings):
     settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
     response, code = _ask_code(anon)
     assert response.status_code == 200 and code is not None
+
+
+@pytest.mark.django_db
+def test_S30_code_is_saved_only_after_the_email_is_sent(anon, monkeypatch):
+    # Sending can take seconds; the database must not be written (and locked) meanwhile.
+    from django.core.mail import send_mail as real_send_mail
+
+    saved_while_sending = []
+
+    def watching_send_mail(*args, **kwargs):
+        saved_while_sending.append(PasswordCode.objects.filter(email=EMAIL).exists())
+        return real_send_mail(*args, **kwargs)
+
+    monkeypatch.setattr("lostfound.auth_views.send_mail", watching_send_mail)
+    response, code = _ask_code(anon)
+    assert response.status_code == 200
+    assert saved_while_sending == [False]
+    assert PasswordCode.objects.filter(email=EMAIL, used=False).count() == 1
+    assert _set_password(anon, code).status_code == 200
+
+@pytest.mark.django_db
+def test_S30_mismatched_confirmation_is_rejected_and_code_still_works(anon):
+    _, code = _ask_code(anon)
+    response = _post(anon, "password/reset", email=EMAIL, code=code, password=GOOD_PASSWORD, password_confirm="other-pass-99")
+    assert response.status_code == 400 and response.json()["detail"] == "The two passwords do not match."
+    response = _post(anon, "password/reset", email=EMAIL, code=code, password=GOOD_PASSWORD, password_confirm=GOOD_PASSWORD)
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_S30_password_change_is_confirmed_by_email(anon):
+    _, code = _ask_code(anon)
+    mail.outbox.clear()
+    _set_password(anon, code)
+    assert [m.subject for m in mail.outbox] == ["Your IITGN Lost & Found account is ready"]
+    assert mail.outbox[0].to == [EMAIL] and GOOD_PASSWORD not in mail.outbox[0].body
+
+    # Changing it later sends a "changed" email.
+    PasswordCode.objects.update(created_at=timezone.now() - timedelta(minutes=2))
+    _, code = _ask_code(anon)
+    mail.outbox.clear()
+    _set_password(anon, code, password="another-lantern-77")
+    assert [m.subject for m in mail.outbox] == ["Your IITGN Lost & Found password was changed"]
+
+
+@pytest.mark.django_db
+def test_S30_password_is_set_even_if_confirmation_email_fails(anon, monkeypatch):
+    import smtplib
+
+    _, code = _ask_code(anon)
+
+    def broken(*args, **kwargs):
+        raise smtplib.SMTPServerDisconnected("Connection unexpectedly closed")
+
+    monkeypatch.setattr("lostfound.auth_views.send_mail", broken)
+    assert _set_password(anon, code).status_code == 200
+    assert get_user_model().objects.get(username=EMAIL).check_password(GOOD_PASSWORD)

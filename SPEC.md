@@ -23,7 +23,7 @@ Each statement has at least one automated test that names its ID.
 - **S24.** The login page has two options, "Sign in as student" and "Sign in as admin". Choosing admin with an email not in `ADMIN_EMAILS` is rejected, and an admin email is rejected on the student option. The choice never grants a role.
 - **S28.** An admin can add another `@iitgn.ac.in` email as an admin, and remove admins added this way, except themselves. Emails in `ADMIN_EMAILS` are permanent admins and can only be changed in `.env`.
 - **S29.** A user can sign in with their `@iitgn.ac.in` email and password (on the student or admin option, S24). A wrong password gets the same message whether or not the account exists, and after 5 wrong passwords that email is locked for 15 minutes.
-- **S30.** A user who forgot their password, or has none yet, asks for a code. A random 6-digit code is emailed to them; only its hash is stored. Entering it with a new password sets the password, creating the account if needed. A code works once, for 10 minutes, for at most 5 tries, and asking again replaces the old code. New passwords must pass Django's password rules.
+- **S30.** A user who forgot their password, or has none yet, asks for a code. A random 6-digit code is emailed to them; only its hash is stored. Entering it with a new password sets the password, creating the account if needed. A code works once, for 10 minutes, for at most 5 tries, and asking again replaces the old code. New passwords must pass Django's password rules. The new password must be typed twice and match. After it is set, the user is emailed a confirmation, and the password stays set even if that email fails.
 
 ### Found items
 

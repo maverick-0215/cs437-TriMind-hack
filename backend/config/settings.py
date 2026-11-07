@@ -62,6 +62,9 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": DATA_DIR / "db.sqlite3",
+        # Wait up to 20 s for a busy database instead of the default 5 s. Azure keeps
+        # /home on network storage, where SQLite's locks are slower.
+        "OPTIONS": {"timeout": 20},
     }
 }
 
@@ -116,6 +119,8 @@ if EMAIL_HOST:
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "IITGN Lost & Found <noreply@iitgn.ac.in>")
+# Give up on a mail server that does not answer instead of hanging the request.
+EMAIL_TIMEOUT = 15
 
 # S29: same rules Django uses for admin passwords.
 AUTH_PASSWORD_VALIDATORS = [

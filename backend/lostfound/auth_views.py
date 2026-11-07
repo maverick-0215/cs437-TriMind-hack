@@ -166,24 +166,26 @@ def password_code(request):
     if latest and not latest.used and timezone.now() - latest.created_at < CODE_RESEND_WAIT:
         return JsonResponse(sent)  # Already sent moments ago: don't flood their inbox.
     code = f"{secrets.randbelow(10**6):06d}"
+    # Send first, save after. Talking to the mail server can take seconds, and holding a
+    # database transaction open meanwhile locks SQLite for every other request
+    # ("database is locked"). If sending fails nothing is saved, so the next request sends
+    # a fresh code instead of claiming "we sent a code".
     try:
-        # If the email fails, the new code is rolled back, so the next request sends a fresh one
-        # instead of claiming "we sent a code".
-        with transaction.atomic():
-            PasswordCode.objects.filter(email=email, used=False).update(used=True)  # only the newest works
-            PasswordCode.objects.create(email=email, code_hash=make_password(code))
-            send_mail(
-                "Your IITGN Lost & Found code",
-                f"Your code is {code}\n\nEnter it on the sign-in page to set your password. It works for 10 minutes.\n"
-                "If you did not ask for this, ignore this email.",
-                None,
-                [email],
-            )
+        send_mail(
+            "Your IITGN Lost & Found code",
+            f"Your code is {code}\n\nEnter it on the sign-in page to set your password. It works for 10 minutes.\n"
+            "If you did not ask for this, ignore this email.",
+            None,
+            [email],
+        )
     except OSError:  # smtplib errors and network failures
         logger.exception("Could not send the password code email to %s", email)
         return JsonResponse(
             {"detail": "We couldn't send the email right now. Try again in a few minutes."}, status=503
         )
+    with transaction.atomic():
+        PasswordCode.objects.filter(email=email, used=False).update(used=True)  # only the newest works
+        PasswordCode.objects.create(email=email, code_hash=make_password(code))
     return JsonResponse(sent)
 
 
@@ -200,6 +202,9 @@ def password_reset(request):
         entry.attempts += 1
         entry.save(update_fields=["attempts"])
         return wrong
+    if "password_confirm" in body and str(body["password_confirm"]) != password:
+        # The code stays valid so they can fix the typo.
+        return JsonResponse({"detail": "The two passwords do not match."}, status=400)
     user = get_user_model().objects.filter(username=email).first() or get_user_model()(
         username=email, email=email, first_name=email.split("@")[0]
     )
@@ -208,9 +213,30 @@ def password_reset(request):
     except ValidationError as e:
         # The code stays valid so they can try a better password.
         return JsonResponse({"detail": " ".join(e.messages)}, status=400)
+    is_new = user.pk is None
     entry.used = True
     entry.save(update_fields=["used"])
     user.set_password(password)
     user.save()
     cache.delete(_failures_key(email))
-    return JsonResponse({"detail": "Password set. You can sign in now."})
+    _send_password_changed_email(email, is_new)
+    return JsonResponse({"detail": "Password set. Sign in with your new password."})
+
+
+def _send_password_changed_email(email, is_new):
+    """S30: confirm by email, so the owner notices if someone else changed their password."""
+    if is_new:
+        subject = "Your IITGN Lost & Found account is ready"
+        opening = "Your IITGN Lost & Found account was created and its password was set."
+    else:
+        subject = "Your IITGN Lost & Found password was changed"
+        opening = "The password for your IITGN Lost & Found account was just changed."
+    body = (
+        f"{opening}\n\nIf this was you, there is nothing else to do.\n"
+        'If it was not you, use "Forgot password?" on the sign-in page right away to set a new one.'
+    )
+    try:
+        send_mail(subject, body, None, [email])
+    except OSError:
+        # The password is already set; a missing confirmation email must not undo that.
+        logger.exception("Could not send the password changed email to %s", email)
