@@ -1,6 +1,8 @@
 import re
 import secrets
+from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 
@@ -17,6 +19,39 @@ def _six_digit_code():
 
 def notify(user, message, link=""):
     Notification.objects.create(user=user, message=message, link=link)
+
+
+# --- Duplicate submissions (S32) ---
+
+# A double click, or a retry on a slow connection, sends the same form again within moments.
+DUPLICATE_WINDOW = timedelta(minutes=2)
+REPORT_FIELDS = ("category", "title", "date_lost", "place_lost", "private_details")
+ITEM_FIELDS = ("category", "title", "date_found", "general_area", "exact_location", "description")
+
+
+def lock_user(user):
+    """Make one person's simultaneous submissions take turns, so a double click arriving in
+    parallel cannot slip past the duplicate check. Call inside transaction.atomic().
+    PostgreSQL locks the user's row; SQLite (no row locks) already serialises writes."""
+    get_user_model().objects.select_for_update().filter(pk=user.pk).first()
+
+
+def recent_duplicate_report(student, data):
+    """S32: the same lost report from the same student in the last two minutes, if any."""
+    return LostReport.objects.filter(
+        student=student,
+        created_at__gte=timezone.now() - DUPLICATE_WINDOW,
+        **{field: data[field] for field in REPORT_FIELDS},
+    ).first()
+
+
+def recent_duplicate_item(admin, data):
+    """S32: the same found item from the same admin in the last two minutes, if any."""
+    return FoundItem.objects.filter(
+        added_by=admin,
+        created_at__gte=timezone.now() - DUPLICATE_WINDOW,
+        **{field: data[field] for field in ITEM_FIELDS},
+    ).first()
 
 
 # --- Matching (S13, S25, S26) ---

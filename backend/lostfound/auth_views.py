@@ -1,5 +1,7 @@
 """Login endpoints. Plain Django views, so Django's CSRF middleware protects the POSTs."""
 
+import hashlib
+import hmac
 import json
 import logging
 import secrets
@@ -7,7 +9,6 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model, login, logout
-from django.contrib.auth.hashers import check_password, make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -124,7 +125,10 @@ def logout_view(request):
 
 CODE_LIFETIME = timedelta(minutes=10)
 CODE_RESEND_WAIT = timedelta(seconds=60)
+# Wrong tries allowed per email within CODE_LIFETIME, across all of its codes.
 MAX_CODE_ATTEMPTS = 5
+# Emails can arrive late or out of order, so the newest few codes all work, not only the last.
+CODES_ACCEPTED = 3
 MAX_LOGIN_FAILURES = 5
 LOGIN_LOCKOUT_SECONDS = 15 * 60
 
@@ -135,6 +139,13 @@ def _email_from(body):
 
 def _failures_key(email):
     return f"login-failures:{email}"
+
+
+def _code_hash(email, code):
+    """S30: only this is stored, never the code. A keyed SHA-256 is enough for a code that
+    lives 10 minutes and allows 5 tries, and it is far faster than password hashing."""
+    message = f"{email}:{code}".encode()
+    return hmac.new(settings.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
 
 
 @require_POST
@@ -183,9 +194,7 @@ def password_code(request):
         return JsonResponse(
             {"detail": "We couldn't send the email right now. Try again in a few minutes."}, status=503
         )
-    with transaction.atomic():
-        PasswordCode.objects.filter(email=email, used=False).update(used=True)  # only the newest works
-        PasswordCode.objects.create(email=email, code_hash=make_password(code))
+    PasswordCode.objects.create(email=email, code_hash=_code_hash(email, code))
     return JsonResponse(sent)
 
 
@@ -194,14 +203,25 @@ def password_reset(request):
     """S30: check the emailed code, then set the password (creating the account if new)."""
     body = _read_json(request)
     email, code, password = _email_from(body), str(body.get("code", "")).strip(), str(body.get("password", ""))
-    wrong = JsonResponse({"detail": "Wrong or expired code. Ask for a new one."}, status=400)
-    entry = PasswordCode.objects.filter(email=email, used=False).first()
-    if entry is None or timezone.now() - entry.created_at > CODE_LIFETIME or entry.attempts >= MAX_CODE_ATTEMPTS:
-        return wrong
-    if not check_password(code, entry.code_hash):
-        entry.attempts += 1
-        entry.save(update_fields=["attempts"])
-        return wrong
+    recent = list(
+        PasswordCode.objects.filter(email=email, used=False, created_at__gte=timezone.now() - CODE_LIFETIME).order_by(
+            "-created_at", "-id"
+        )
+    )  # newest first
+    if not recent:
+        return JsonResponse({"detail": "That code has expired. Ask for a new one."}, status=400)
+    if sum(entry.attempts for entry in recent) >= MAX_CODE_ATTEMPTS:
+        return JsonResponse(
+            {"detail": "Too many wrong tries. Wait 10 minutes, then ask for a new code."}, status=429
+        )
+    given = _code_hash(email, code)
+    if not any(hmac.compare_digest(given, entry.code_hash) for entry in recent[:CODES_ACCEPTED]):
+        newest = recent[0]
+        newest.attempts += 1
+        newest.save(update_fields=["attempts"])
+        return JsonResponse(
+            {"detail": "That code isn't right. Check the code in your most recent email."}, status=400
+        )
     if "password_confirm" in body and str(body["password_confirm"]) != password:
         # The code stays valid so they can fix the typo.
         return JsonResponse({"detail": "The two passwords do not match."}, status=400)
@@ -214,10 +234,11 @@ def password_reset(request):
         # The code stays valid so they can try a better password.
         return JsonResponse({"detail": " ".join(e.messages)}, status=400)
     is_new = user.pk is None
-    entry.used = True
-    entry.save(update_fields=["used"])
-    user.set_password(password)
-    user.save()
+    with transaction.atomic():
+        # Every code for this email is spent once one of them works.
+        PasswordCode.objects.filter(email=email, used=False).update(used=True)
+        user.set_password(password)
+        user.save()
     cache.delete(_failures_key(email))
     _send_password_changed_email(email, is_new)
     return JsonResponse({"detail": "Password set. Sign in with your new password."})

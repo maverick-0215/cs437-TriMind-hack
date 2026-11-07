@@ -201,3 +201,25 @@ it('will not set a password until both boxes match, and ignores spaces in the co
   expect(screen.queryByText('The two passwords do not match.')).toBeNull()
   expect((screen.getByText('Set password') as HTMLButtonElement).disabled).toBe(false)
 })
+
+it('S32: files a lost report only once however often the button is clicked', async () => {
+  let posts = 0
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json(STUDENT)
+    if (url === '/api/reports' && init?.method === 'POST') {
+      posts += 1
+      return json({ id: 7 }, 201)
+    }
+    return json([])
+  })
+  renderAt('/reports/new')
+  const button = await screen.findByText('File report')
+  const form = button.closest('form')!
+  fireEvent.submit(form)
+  fireEvent.submit(form)
+  fireEvent.submit(form)
+  await screen.findByText('Saving…').catch(() => null)
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(posts).toBe(1)
+})

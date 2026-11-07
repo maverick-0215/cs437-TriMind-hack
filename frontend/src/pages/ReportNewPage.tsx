@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
 import { todayISO } from '../format'
@@ -7,9 +7,16 @@ import { CATEGORIES, type Report } from '../types'
 export default function ReportNewPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  // S32: one save at a time. The ref blocks a second click instantly, before React re-renders.
+  const saving = useRef(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (saving.current) return
+    saving.current = true
+    setIsSaving(true)
+    setError(null)
     try {
       const report = await api<Report>('reports', {
         method: 'POST',
@@ -18,6 +25,8 @@ export default function ReportNewPage() {
       navigate(`/reports/${report.id}`)
     } catch (e) {
       setError((e as Error).message)
+      saving.current = false
+      setIsSaving(false)
     }
   }
 
@@ -54,7 +63,7 @@ export default function ReportNewPage() {
           <textarea name="private_details" required rows={4} />
         </label>
         {error && <p className="error">{error}</p>}
-        <button>File report</button>
+        <button disabled={isSaving}>{isSaving ? 'Saving…' : 'File report'}</button>
       </form>
     </section>
   )

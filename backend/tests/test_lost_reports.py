@@ -72,3 +72,16 @@ def test_S25_report_shows_items_matching_60_percent_with_contact(student_client,
 def test_S25_report_with_no_matches_has_empty_list(student_client, make_report):
     report = make_report()
     assert student_client.get(f"/api/reports/{report.pk}").json()["matches"] == []
+
+
+
+@pytest.mark.django_db
+def test_S32_double_submitted_report_is_saved_once(student_client, other_client):
+    first = student_client.post("/api/reports", NEW_REPORT, format="json")
+    again = student_client.post("/api/reports", NEW_REPORT, format="json")
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert again.json()["id"] == first.json()["id"]
+    assert LostReport.objects.count() == 1
+    # Another student filing the same details is their own report.
+    assert other_client.post("/api/reports", NEW_REPORT, format="json").status_code == 201
+    assert LostReport.objects.count() == 2

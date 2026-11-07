@@ -2,6 +2,7 @@ import re
 from datetime import timedelta
 
 import pytest
+from django.db.models import F
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.utils import timezone
@@ -60,17 +61,45 @@ def test_S30_code_expires_and_locks_after_5_tries(anon):
     wrong = "000000" if code != "000000" else "111111"
     for _ in range(5):
         _set_password(anon, wrong)
-    assert _set_password(anon, code).status_code == 400
+    assert _set_password(anon, code).status_code == 429
 
 
 @pytest.mark.django_db
-def test_S30_new_code_replaces_old_one(anon):
+def test_S30_recent_codes_all_work_because_emails_arrive_out_of_order(anon):
+    codes = []
+    for _ in range(4):
+        # Age the earlier codes past the one-minute resend wait, keeping their order.
+        PasswordCode.objects.update(created_at=F("created_at") - timedelta(minutes=2))
+        codes.append(_ask_code(anon)[1])
+    oldest, *newest_three = codes
+    if oldest not in newest_three:
+        # Only the three newest codes are accepted.
+        assert _set_password(anon, oldest).json()["detail"].startswith("That code isn't right")
+    assert _set_password(anon, newest_three[0]).status_code == 200
+    # Once one works, all of them are spent.
+    assert _set_password(anon, newest_three[-1], password="another-lantern-77").status_code == 400
+
+
+@pytest.mark.django_db
+def test_S30_messages_say_what_went_wrong(anon):
+    _, code = _ask_code(anon)
+    wrong = "000000" if code != "000000" else "111111"
+    assert _set_password(anon, wrong).json()["detail"].startswith("That code isn't right")
+    PasswordCode.objects.update(created_at=timezone.now() - timedelta(minutes=11))
+    assert _set_password(anon, code).json()["detail"] == "That code has expired. Ask for a new one."
+
+
+@pytest.mark.django_db
+def test_S30_five_wrong_tries_block_every_code_for_that_email(anon):
     _, first = _ask_code(anon)
     PasswordCode.objects.update(created_at=timezone.now() - timedelta(minutes=2))
     _, second = _ask_code(anon)
-    if first != second:
-        assert _set_password(anon, first).status_code == 400
-    assert _set_password(anon, second).status_code == 200
+    wrong = next(c for c in ("000000", "111111", "222222") if c not in (first, second))
+    for _ in range(5):
+        _set_password(anon, wrong)
+    for code in (first, second):
+        response = _set_password(anon, code)
+        assert response.status_code == 429 and "Too many wrong tries" in response.json()["detail"]
 
 
 @pytest.mark.django_db
