@@ -1,6 +1,7 @@
 """Login endpoints. Plain Django views, so Django's CSRF middleware protects the POSTs."""
 
 import json
+import logging
 import secrets
 from datetime import timedelta
 
@@ -11,6 +12,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
+from django.db import transaction
 from django.utils import timezone
 from django.http import Http404, JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -20,6 +22,8 @@ from google.oauth2 import id_token
 
 from .models import PasswordCode
 from .permissions import email_allowed, is_admin, is_admin_email
+
+logger = logging.getLogger(__name__)
 
 
 def _user_json(user):
@@ -162,15 +166,24 @@ def password_code(request):
     if latest and not latest.used and timezone.now() - latest.created_at < CODE_RESEND_WAIT:
         return JsonResponse(sent)  # Already sent moments ago: don't flood their inbox.
     code = f"{secrets.randbelow(10**6):06d}"
-    PasswordCode.objects.filter(email=email, used=False).update(used=True)  # only the newest works
-    PasswordCode.objects.create(email=email, code_hash=make_password(code))
-    send_mail(
-        "Your IITGN Lost & Found code",
-        f"Your code is {code}\n\nEnter it on the sign-in page to set your password. It works for 10 minutes.\n"
-        "If you did not ask for this, ignore this email.",
-        None,
-        [email],
-    )
+    try:
+        # If the email fails, the new code is rolled back, so the next request sends a fresh one
+        # instead of claiming "we sent a code".
+        with transaction.atomic():
+            PasswordCode.objects.filter(email=email, used=False).update(used=True)  # only the newest works
+            PasswordCode.objects.create(email=email, code_hash=make_password(code))
+            send_mail(
+                "Your IITGN Lost & Found code",
+                f"Your code is {code}\n\nEnter it on the sign-in page to set your password. It works for 10 minutes.\n"
+                "If you did not ask for this, ignore this email.",
+                None,
+                [email],
+            )
+    except OSError:  # smtplib errors and network failures
+        logger.exception("Could not send the password code email to %s", email)
+        return JsonResponse(
+            {"detail": "We couldn't send the email right now. Try again in a few minutes."}, status=503
+        )
     return JsonResponse(sent)
 
 
