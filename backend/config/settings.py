@@ -28,6 +28,10 @@ ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").sp
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 # S25: who students should contact about a matching found item.
 SECURITY_CONTACT = os.environ.get("SECURITY_CONTACT", "IITGN Security Office, Main Gate")
+# The site's address, for links in emails. On Azure it defaults to the app's own address.
+SITE_URL = os.environ.get("SITE_URL") or (
+    f"https://{os.environ['WEBSITE_HOSTNAME']}" if os.environ.get("WEBSITE_HOSTNAME") else "http://localhost:5173"
+)
 # Development-only email login, for trying the app before a Google client ID exists.
 # It can only be switched on together with DEBUG.
 DEV_LOGIN = DEBUG and os.environ.get("DEV_LOGIN", "0") == "1"
