@@ -52,7 +52,7 @@ SPEC.md              What the app must do (S1 to S31)
 
 ## Getting started
 
-You need **Python 3.12+** and **Node.js 20+**. Run the backend and frontend in two separate terminals.
+You need **Python 3.12+** and **Node.js 22.12+** (Node 24 recommended). Run the backend and frontend in two separate terminals.
 
 ### 1. Backend (http://localhost:8000)
 
