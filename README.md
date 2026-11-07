@@ -39,6 +39,7 @@ backend/
     auth_views.py    Sign-in: password, emailed codes, Google, dev login
     permissions.py   Who is an admin, who is a student
   tests/             One or more tests for every statement in SPEC.md
+  startup.sh         Production start: migrations, then gunicorn
 frontend/
   src/
     pages/           Student pages, plus admin/ for the security office
@@ -46,6 +47,7 @@ frontend/
     Layout.tsx       Header and navigation
     index.css        All styles
 SPEC.md              What the app must do (S1 to S31)
+.github/workflows/   Tests every push; deploys main to Azure
 ```
 
 ## Getting started
@@ -103,6 +105,8 @@ Settings live in `backend/.env`. Start from `backend/.env.example`.
 | `GOOGLE_CLIENT_ID` | Optional. Adds a "Sign in with Google" button. Create a Web client ID in Google Cloud Console and add `http://localhost:5173` as an authorized JavaScript origin. |
 | `DEV_LOGIN` | Development only. `1` lets anyone sign in by typing an email, with no password. Works only with `DEBUG=1`. Keep it `0` whenever other people can reach the app. |
 | `CSRF_TRUSTED_ORIGINS` | The address the frontend is served from. Defaults to the Vite dev server. |
+| `ALLOWED_HOSTS` | Domain names the site answers to. Defaults to `localhost`. |
+| `DATA_DIR` | Folder for the database and photos. Defaults to `backend/`. Use `/home/data` on Azure. |
 
 ### Sending real email
 
@@ -128,5 +132,6 @@ npm run build     # type check and production build
 
 - Set `DEBUG=0`, `DEV_LOGIN=0` and a long random `SECRET_KEY`.
 - Set up real email so students receive their codes.
+- On Azure, set `DATA_DIR=/home/data`, or the database is lost on every deploy.
 - Put the real security office emails in `ADMIN_EMAILS` and the real contact details in `SECURITY_CONTACT`.
 - Never commit `backend/.env`. It is already in `.gitignore`.

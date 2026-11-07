@@ -152,3 +152,16 @@ def test_S24_dev_login_checks_role_too(anon, settings):
     post = lambda email, role: anon.post("/api/auth/dev-login", {"email": email, "role": role}, format="json")
     assert post("asha@iitgn.ac.in", "admin").status_code == 403
     assert post(ADMIN_EMAIL, "admin").status_code == 200
+
+
+
+@pytest.mark.django_db
+def test_pages_outside_api_get_the_react_app(anon, settings, tmp_path):
+    settings.FRONTEND_DIST = tmp_path
+    assert anon.get("/reports").status_code == 404  # not built yet
+    (tmp_path / "index.html").write_text("<div id=root></div>")
+    for path in ["/", "/reports/5", "/admin/items/new"]:
+        response = anon.get(path)
+        assert response.status_code == 200 and b"id=root" in b"".join(response.streaming_content)
+    # The API is untouched.
+    assert anon.get("/api/reports").status_code == 401
