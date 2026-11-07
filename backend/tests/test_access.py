@@ -147,6 +147,12 @@ def test_S24_sign_in_option_must_match_role(anon, google):
 
 
 @pytest.mark.django_db
+def test_google_sign_in_popup_can_report_back(anon):
+    # "same-origin" would leave the Google popup blank: it could not hand the sign-in back.
+    assert anon.get("/api/auth/config")["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups"
+
+
+@pytest.mark.django_db
 def test_S24_dev_login_checks_role_too(anon, settings):
     settings.DEV_LOGIN = True
     post = lambda email, role: anon.post("/api/auth/dev-login", {"email": email, "role": role}, format="json")

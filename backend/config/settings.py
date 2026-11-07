@@ -111,6 +111,10 @@ if FRONTEND_DIST.is_dir():
     # Vite puts a content hash in every file under assets/, so browsers may cache them forever.
     WHITENOISE_IMMUTABLE_FILE_TEST = r"^/assets/.+-[0-9A-Za-z_-]{8,}\.\w+$"
 
+# Django's default ("same-origin") cuts the page off from the "Sign in with Google" popup,
+# which then stays blank forever. Google's docs ask for this value instead.
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+
 # Production behind HTTPS (Azure terminates TLS and forwards the original scheme).
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
