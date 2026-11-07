@@ -117,3 +117,19 @@ def test_S29_locked_after_5_wrong_passwords(anon):
     for _ in range(5):
         _post(anon, "login", email=EMAIL, password="wrong-password")
     assert _post(anon, "login", email=EMAIL, password=GOOD_PASSWORD).status_code == 429
+
+
+@pytest.mark.django_db
+def test_S30_failed_email_is_reported_and_nothing_is_kept(anon, settings):
+    # A mail server that refuses the connection, like a misconfigured SMTP host in production.
+    settings.EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    settings.EMAIL_HOST, settings.EMAIL_PORT, settings.EMAIL_TIMEOUT = "127.0.0.1", 1, 2
+    for _ in range(2):
+        response = _post(anon, "password/code", email=EMAIL)
+        assert response.status_code == 503
+        assert "couldn't send" in response.json()["detail"]
+    assert not PasswordCode.objects.filter(used=False).exists()
+    # Once email works again, a code goes out straight away instead of "already sent".
+    settings.EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+    response, code = _ask_code(anon)
+    assert response.status_code == 200 and code is not None
