@@ -1,6 +1,7 @@
 import pytest
 
 from django.core import mail
+from django.utils import timezone
 
 from lostfound.models import Claim, FoundItem, Handover, Notification
 
@@ -236,3 +237,28 @@ def test_S18_cancelled_approval_is_emailed(approved_item, admin_client, student,
     assert [m.to for m in mail.outbox] == [[student.email]]
     assert "cancelled" in mail.outbox[0].subject.lower()
     assert CODE not in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_collection_is_notified_and_emailed_with_date_and_link(
+    approved_item, admin_client, student, settings, django_capture_on_commit_callbacks
+):
+    settings.SITE_URL = "https://lostfound.example"
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert _hand_over(admin_client, approved_item, CODE).status_code == 201
+    collected_at = timezone.localtime(approved_item.claims.get().code_used_at).strftime("%d %b %Y, %I:%M %p")
+    note = Notification.objects.filter(user=student).latest("id")
+    assert collected_at in note.message and note.link == "/reports"
+    assert [m.to for m in mail.outbox] == [[student.email]]
+    assert collected_at in mail.outbox[0].body
+    assert "https://lostfound.example/reports" in mail.outbox[0].body
+    assert CODE not in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_wrong_code_sends_no_collection_email(approved_item, admin_client, django_capture_on_commit_callbacks):
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert _hand_over(admin_client, approved_item, "000000").status_code == 400
+    assert mail.outbox == []

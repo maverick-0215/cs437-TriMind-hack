@@ -235,4 +235,13 @@ def hand_over(item, code, admin):
     claim.save(update_fields=["code_used_at"])
     item.status = FoundItem.Status.RETURNED
     item.save(update_fields=["status"])
+    collected_at = timezone.localtime(claim.code_used_at).strftime("%d %b %Y, %I:%M %p")
+    notify(claim.student, f'You collected "{item.title}" on {collected_at}.', "/reports")
+    email_after_save(
+        claim.student,
+        f'You collected "{item.title}"',
+        f'You collected "{item.title}" from the IITGN security office on {collected_at}.\n\n'
+        f"Your lost report is now closed. See it on IITGN Lost & Found: {settings.SITE_URL}/reports\n\n"
+        "If you did not collect this item, contact the security office right away.",
+    )
     return Handover.objects.create(item=item, student=claim.student, admin=admin)
