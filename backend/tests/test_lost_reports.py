@@ -44,3 +44,31 @@ def test_S12_opening_another_students_report_is_404(student_client, other_client
     response = other_client.get(f"/api/reports/{report.pk}")
     assert response.status_code == 404
     assert "PRIVATE-REPORT" not in response.content.decode()
+
+
+@pytest.mark.django_db
+def test_S25_report_shows_items_matching_60_percent_with_contact(student_client, make_report, make_item, admin_user):
+    from datetime import date
+
+    from lostfound.models import FoundItem
+
+    report = make_report(category="Electronics", title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 9))
+    make_item(title="Black phone", general_area="Library", date_found=date(2026, 10, 10))
+    make_item(title="Phone", general_area="Mess", date_found=date(2026, 10, 12))
+    make_item(title="Laptop charger", general_area="Hostel")
+    make_item(title="Claimed phone", status=FoundItem.Status.CLAIMED)
+
+    body = student_client.get(f"/api/reports/{report.pk}").json()
+    assert [(m["title"], m["score"]) for m in body["matches"]] == [("Black phone", 100), ("Phone", 85)]
+    match = body["matches"][0]
+    assert match["general_area"] == "Library"
+    assert match["contact"] == admin_user.email
+    assert body["security_contact"]
+    # S7 still holds: no private item details.
+    assert "SECRET" not in str(body)
+
+
+@pytest.mark.django_db
+def test_S25_report_with_no_matches_has_empty_list(student_client, make_report):
+    report = make_report()
+    assert student_client.get(f"/api/reports/{report.pk}").json()["matches"] == []

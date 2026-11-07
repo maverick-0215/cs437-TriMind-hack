@@ -1,6 +1,14 @@
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Category, Claim, FoundItem, Handover, LostReport, Notification
+from .models import AdminEmail, Claim, FoundItem, Handover, LostReport, Notification
+
+
+def not_in_future(value):
+    """S31: an item cannot be lost or found after today (campus time, Asia/Kolkata)."""
+    if value > timezone.localdate():
+        raise serializers.ValidationError("The date cannot be in the future.")
+    return value
 
 
 class PublicItemSerializer(serializers.ModelSerializer):
@@ -9,6 +17,15 @@ class PublicItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = FoundItem
         fields = ["id", "category", "title", "date_found", "general_area"]
+
+
+class MatchItemSerializer(PublicItemSerializer):
+    """S25: a found item matching a student's report, plus who to contact. Still no private details."""
+
+    contact = serializers.EmailField(source="added_by.email", read_only=True)
+
+    class Meta(PublicItemSerializer.Meta):
+        fields = PublicItemSerializer.Meta.fields + ["contact"]
 
 
 class AdminItemSerializer(serializers.ModelSerializer):
@@ -24,17 +41,34 @@ class AdminItemSerializer(serializers.ModelSerializer):
             "status", "added_by", "created_at",
         ]
         read_only_fields = ["status", "created_at"]
+        extra_kwargs = {"date_found": {"validators": [not_in_future]}}
 
     def get_has_photo(self, item):
         return bool(item.photo)
 
 
 class ReportSerializer(serializers.ModelSerializer):
-    linked_item = PublicItemSerializer(read_only=True)
+    # S27: OPEN, APPROVED (waiting for pickup) or CLOSED (collected).
+    status = serializers.SerializerMethodField()
+    closed_at = serializers.SerializerMethodField()
+    item = PublicItemSerializer(source="linked_item", read_only=True)
 
     class Meta:
         model = LostReport
-        fields = ["id", "category", "title", "date_lost", "place_lost", "private_details", "linked_item", "created_at"]
+        fields = [
+            "id", "category", "title", "date_lost", "place_lost", "private_details", "created_at",
+            "status", "closed_at", "item",
+        ]
+        extra_kwargs = {"date_lost": {"validators": [not_in_future]}}
+
+    def get_status(self, report):
+        if report.linked_item is None:
+            return "OPEN"
+        return "CLOSED" if report.linked_item.status == FoundItem.Status.RETURNED else "APPROVED"
+
+    def get_closed_at(self, report):
+        handover = getattr(report.linked_item, "handover", None) if report.linked_item else None
+        return handover.handed_over_at if handover else None
 
 
 class AdminReportSerializer(serializers.ModelSerializer):
@@ -42,7 +76,7 @@ class AdminReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LostReport
-        fields = ["id", "category", "title", "date_lost", "place_lost", "private_details", "student", "linked_item"]
+        fields = ["id", "category", "title", "date_lost", "place_lost", "private_details", "student"]
 
 
 class MyClaimSerializer(serializers.ModelSerializer):
@@ -85,21 +119,31 @@ class HandoverSerializer(serializers.ModelSerializer):
         fields = ["id", "item", "student", "admin", "handed_over_at"]
 
 
-class ItemFilterSerializer(serializers.Serializer):
-    category = serializers.ChoiceField(choices=Category.choices, required=False, allow_blank=True)
-    date_from = serializers.DateField(required=False)
-    date_to = serializers.DateField(required=False)
-    q = serializers.CharField(required=False, allow_blank=True, max_length=100)
+class ApproveSerializer(serializers.Serializer):
+    """Who the admin approves: a student from a matching report, or any IITGN email."""
 
+    report_id = serializers.PrimaryKeyRelatedField(
+        queryset=LostReport.objects.select_related("student"), source="report", required=False
+    )
+    email = serializers.EmailField(required=False)
 
-class ClaimCreateSerializer(serializers.Serializer):
-    description = serializers.CharField()
-
-
-class LinkSerializer(serializers.Serializer):
-    report_id = serializers.PrimaryKeyRelatedField(queryset=LostReport.objects.all(), source="report")
+    def validate(self, data):
+        if ("report" in data) == ("email" in data):
+            raise serializers.ValidationError("Give either a lost report or an email.")
+        return data
 
 
 class PickupCodeSerializer(serializers.Serializer):
     # [0-9], not \d: \d also matches non-ASCII digits, which compare_digest rejects.
     code = serializers.RegexField(r"^[0-9]{6}$", error_messages={"invalid": "Enter the 6-digit pickup code."})
+
+
+class AdminEmailSerializer(serializers.ModelSerializer):
+    added_by = serializers.EmailField(source="added_by.email", read_only=True)
+
+    class Meta:
+        model = AdminEmail
+        fields = ["id", "email", "added_by", "created_at"]
+        read_only_fields = ["created_at"]
+        # Duplicates are checked in the view, which also knows about ADMIN_EMAILS.
+        extra_kwargs = {"email": {"validators": []}}

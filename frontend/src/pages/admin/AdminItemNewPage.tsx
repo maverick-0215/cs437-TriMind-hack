@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../../api'
+import { todayISO } from '../../format'
 import { CATEGORIES, type AdminItem } from '../../types'
 
 export default function AdminItemNewPage() {
@@ -21,10 +22,9 @@ export default function AdminItemNewPage() {
   }
 
   return (
-    <>
+    <section className="form-page">
       <h1>Add found item</h1>
       <form className="card stack" onSubmit={submit}>
-        <p className="muted">Everyone who logs in sees these:</p>
         <label>
           Category
           <select name="category" required defaultValue="">
@@ -42,16 +42,14 @@ export default function AdminItemNewPage() {
         </label>
         <label>
           Date found
-          <input name="date_found" type="date" required />
+          <input name="date_found" type="date" required max={todayISO()} />
         </label>
         <label>
           General area
           <input name="general_area" required maxLength={120} placeholder="Library" />
         </label>
 
-        <p className="muted">
-          <span className="tag">private</span> Only the security office sees these:
-        </p>
+        <p className="form-note">Only admins can see the details below.</p>
         <label>
           Exact location
           <input name="exact_location" required maxLength={200} placeholder="Reading hall, desk 14" />
@@ -67,6 +65,6 @@ export default function AdminItemNewPage() {
         {error && <p className="error">{error}</p>}
         <button>Add item</button>
       </form>
-    </>
+    </section>
   )
 }

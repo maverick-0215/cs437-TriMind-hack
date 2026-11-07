@@ -3,6 +3,7 @@ from datetime import date
 import pytest
 
 from lostfound.models import Notification
+from lostfound.services import MATCH_THRESHOLD, match_score
 
 NEW_ITEM = {
     "category": "Electronics",
@@ -15,42 +16,40 @@ NEW_ITEM = {
 
 
 @pytest.mark.django_db
-def test_S13_adding_item_suggests_matching_unlinked_reports(admin_client, make_report, make_item, other_student):
-    make_report(title="Lost earlier", date_lost=date(2026, 10, 1))
-    make_report(title="Lost same day", date_lost=date(2026, 10, 10), student=other_student)
-    make_report(title="Lost after found date", date_lost=date(2026, 10, 11))
-    make_report(title="Wrong category", category="Wallet", date_lost=date(2026, 10, 1))
-    make_report(title="Already linked", date_lost=date(2026, 10, 1), linked_item=make_item(title="Other"))
-
-    item_id = admin_client.post("/api/admin/items", NEW_ITEM, format="multipart").json()["id"]
-    suggestions = admin_client.get(f"/api/admin/items/{item_id}").json()["suggestions"]
-    assert sorted(r["title"] for r in suggestions) == ["Lost earlier", "Lost same day"]
-
-
-@pytest.mark.django_db
-def test_S14_admin_links_any_report_even_across_categories(admin_client, make_report, make_item):
-    item = make_item(category="Electronics")
-    report = make_report(category="Wallet")
-    response = admin_client.post(f"/api/admin/items/{item.pk}/link", {"report_id": report.pk}, format="json")
-    assert response.status_code == 204
-    report.refresh_from_db()
-    assert report.linked_item == item
+def test_S13_score_rewards_category_words_place_and_date(make_report, make_item):
+    item = make_item(category="Electronics", title="Black phone", general_area="Library", date_found=date(2026, 10, 10))
+    perfect = make_report(category="Electronics", title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 9))
+    assert match_score(perfect, item) == 100
+    # Same category and date but nothing else in common: below 60%.
+    vague = make_report(category="Electronics", title="Laptop charger", place_lost="Hostel", date_lost=date(2026, 10, 9))
+    assert match_score(vague, item) < MATCH_THRESHOLD
+    # Wrong category can still match when the words and place agree strongly.
+    cross = make_report(category="Other", title="Black phone", place_lost="Library", date_lost=date(2026, 10, 9))
+    assert match_score(cross, item) >= MATCH_THRESHOLD
+    # Found long before it was lost: no date points.
+    early = make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 11, 30))
+    assert match_score(early, item) == 85
 
 
 @pytest.mark.django_db
-def test_S14_already_linked_report_can_be_moved_to_another_item(admin_client, make_report, make_item):
-    wrong, right = make_item(title="Wrong"), make_item(title="Right")
-    report = make_report(linked_item=wrong)
-    admin_client.post(f"/api/admin/items/{right.pk}/link", {"report_id": report.pk}, format="json")
-    report.refresh_from_db()
-    assert report.linked_item == right
+def test_S13_admin_sees_matching_reports_best_first(admin_client, make_report, make_item, other_student):
+    item = make_item(title="Black phone", general_area="Library")
+    make_report(title="Lost my phone", place_lost="Library")
+    make_report(title="Phone", place_lost="Mess", student=other_student)
+    make_report(title="Laptop charger", place_lost="Hostel")
+    candidates = admin_client.get(f"/api/admin/items/{item.pk}").json()["candidates"]
+    assert [(c["title"], c["score"]) for c in candidates] == [("Lost my phone", 100), ("Phone", 85)]
+    assert candidates[0]["private_details"] == "PRIVATE-REPORT Totoro sticker"
+    assert candidates[1]["student"] == other_student.email
 
 
 @pytest.mark.django_db
-def test_S15_only_the_filing_student_is_notified(
-    admin_client, student_client, make_report, make_item, student, other_student, admin_user
-):
-    item, report = make_item(), make_report()
-    admin_client.post(f"/api/admin/items/{item.pk}/link", {"report_id": report.pk}, format="json")
-    assert list(Notification.objects.values_list("user", flat=True)) == [student.pk]
-    assert len(student_client.get("/api/notifications").json()) == 1
+def test_S26_adding_item_notifies_students_with_matching_reports(admin_client, make_report, other_student):
+    match = make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 1))
+    make_report(title="Laptop charger", place_lost="Hostel", student=other_student)
+    make_report(title="Brown wallet", category="Wallet", place_lost="Mess", student=other_student)
+
+    admin_client.post("/api/admin/items", NEW_ITEM, format="multipart")
+    notes = list(Notification.objects.all())
+    assert [(n.user, n.link) for n in notes] == [(match.student, f"/reports/{match.pk}")]
+    assert "Lost my phone" in notes[0].message

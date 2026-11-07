@@ -4,7 +4,7 @@ import { formatDate, formatDateTime } from '../../format'
 import type { AdminClaim, AdminItem } from '../../types'
 
 export default function AdminDashboardPage() {
-  const { data: pending } = useApi<AdminClaim[]>('admin/claims/pending')
+  const { data: pending } = useApi<AdminClaim[]>('admin/pickups')
   const { data: items, error } = useApi<AdminItem[]>('admin/items')
 
   return (
@@ -16,8 +16,9 @@ export default function AdminDashboardPage() {
         </Link>
       </div>
 
-      <h2>Claims waiting for review</h2>
-      {pending?.length === 0 && <p className="empty">No pending claims.</p>}
+      <h2>Waiting for pickup</h2>
+      <p className="muted">Approved people who haven't collected yet. Ask them for their pickup code.</p>
+      {pending?.length === 0 && <p className="empty">No one is waiting for pickup.</p>}
       <ul className="cards">
         {pending?.map((c) => (
           <li key={c.id} className="card item-card">
@@ -26,10 +27,10 @@ export default function AdminDashboardPage() {
                 <strong>{c.item.title}</strong>
               </Link>
               <p className="muted">
-                {c.student} · {formatDateTime(c.created_at)}
+                {c.student} · approved {formatDateTime(c.created_at)}
               </p>
             </div>
-            <Link to={`/admin/items/${c.item.id}`}>Review</Link>
+            <Link to={`/admin/items/${c.item.id}`}>Hand over</Link>
           </li>
         ))}
       </ul>

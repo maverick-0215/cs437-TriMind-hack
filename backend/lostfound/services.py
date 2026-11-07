@@ -1,7 +1,7 @@
+import re
 import secrets
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from .models import Claim, FoundItem, Handover, LostReport, Notification
@@ -19,87 +19,127 @@ def notify(user, message, link=""):
     Notification.objects.create(user=user, message=message, link=link)
 
 
-# --- Found-items list (S6, S8-S10, S22) ---
+# --- Matching (S13, S25, S26) ---
+
+MATCH_THRESHOLD = 60  # percent
+
+# Words that say nothing about the item itself.
+_STOPWORDS = {
+    "a", "an", "the", "my", "i", "lost", "found", "of", "in", "on", "at", "near", "with", "and", "or",
+    "is", "it", "to", "for", "from", "by", "some", "one", "new", "old",
+}
 
 
-def available_items(category="", date_from=None, date_to=None, q=""):
-    items = FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE)
-    if category:
-        items = items.filter(category=category)
-    if date_from:
-        items = items.filter(date_found__gte=date_from)
-    if date_to:
-        items = items.filter(date_found__lte=date_to)
-    if q:
-        items = items.filter(Q(title__icontains=q) | Q(category__icontains=q))
-    return items.order_by("-date_found", "-created_at")
+def _words(text):
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _STOPWORDS and len(w) > 1}
 
 
-# --- Matching (S13-S15) ---
+def _overlap(a, b):
+    """Share of the smaller word set that also appears in the other, 0 to 1."""
+    a, b = _words(a), _words(b)
+    if not a or not b:
+        return 0.0
+    return len(a & b) / min(len(a), len(b))
 
 
-def suggest_reports(item):
-    return LostReport.objects.filter(
-        linked_item__isnull=True,
-        category=item.category,
-        date_lost__lte=item.date_found,
-    ).select_related("student")
+def match_score(report, item):
+    """S13: how well a found item fits a lost report, 0 to 100. Uses only public item fields,
+    so a student cannot learn private details by probing with reports."""
+    score = 40 if report.category == item.category else 0
+    # The item's category counts as a word too, so "Umbrella" matches a "Blue brolly" in Umbrella.
+    # Not on both sides, or every same-category pair would share a word for free.
+    score += 30 * _overlap(report.title, f"{item.title} {item.category}")
+    score += 15 * _overlap(report.place_lost, item.general_area)
+    days = (item.date_found - report.date_lost).days
+    if 0 <= days <= 7:
+        score += 15
+    elif 0 <= days <= 30:
+        score += 8
+    elif days > 30:
+        score += 3
+    # Found before it was lost (more than a day early) earns nothing for date.
+    return round(min(score, 100))
 
 
-def link_report(report, item):
-    # S14: any report, including one already linked elsewhere, so a wrong link can be fixed.
-    report.linked_item = item
-    report.save(update_fields=["linked_item"])
-    notify(
-        report.student,
-        f'A found item may match your lost report "{report.title}". Claim it if it is yours.',
-        f"/reports/{report.pk}",
-    )
+def matching_items(report):
+    """S25: AVAILABLE items matching the report by at least MATCH_THRESHOLD, best first."""
+    items = FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).select_related("added_by")
+    scored = [(item, match_score(report, item)) for item in items]
+    return sorted([m for m in scored if m[1] >= MATCH_THRESHOLD], key=lambda m: (-m[1], -m[0].pk))
 
 
-# --- Claims and handover (S16-S21) ---
+def matching_reports(item):
+    """S13: open lost reports matching the item by at least MATCH_THRESHOLD, best first.
+    A report linked to an item is approved or closed (S27), so it is left out."""
+    reports = LostReport.objects.filter(linked_item__isnull=True).select_related("student")
+    scored = [(report, match_score(report, item)) for report in reports]
+    return sorted([m for m in scored if m[1] >= MATCH_THRESHOLD], key=lambda m: (-m[1], -m[0].pk))
+
+
+def notify_matching_reports(item):
+    """S26: tell each student whose report matches a newly added item."""
+    for report, score in matching_reports(item):
+        notify(
+            report.student,
+            f'A found item "{item.title}" matches your lost report "{report.title}" ({score}%). '
+            "Open the report to see where to collect it.",
+            f"/reports/{report.pk}",
+        )
+
+
+# --- Approval and handover (S16-S21) ---
 
 
 @transaction.atomic
-def create_claim(item, student, description):
+def approve_owner(item, student, admin, report=None):
+    """S16, S17: after checking the student in person, the admin approves them as the owner.
+    S27: the approval is tied to the student's lost report, so it closes on handover. Without a
+    report given, their best open matching report is used, if they have one."""
     item = FoundItem.objects.select_for_update().get(pk=item.pk)
     if item.status != FoundItem.Status.AVAILABLE:
-        raise ClaimError("This item is no longer available to claim.")
-    claim = Claim.objects.create(item=item, student=student, description=description)
+        raise ClaimError("This item is already approved for someone or returned.")
+    if report is None:
+        own = [(r, s) for r, s in matching_reports(item) if r.student_id == student.pk]
+        report = own[0][0] if own else None
+    elif report.linked_item_id is not None:
+        raise ClaimError("That lost report is already approved for another item or closed.")
+    if report is not None:
+        report.linked_item = item
+        report.save(update_fields=["linked_item"])
+    claim = Claim.objects.create(
+        item=item,
+        student=student,
+        description="Checked in person by the security office.",
+        status=Claim.Status.APPROVED,
+        decided_by=admin,
+        decided_at=timezone.now(),
+        pickup_code=_six_digit_code(),
+    )
     item.status = FoundItem.Status.CLAIMED
     item.save(update_fields=["status"])
-    return claim
-
-
-def _decide(claim, admin, status):
-    claim = Claim.objects.select_for_update().select_related("item").get(pk=claim.pk)
-    if claim.status != Claim.Status.PENDING:
-        raise ClaimError("This claim was already reviewed.")
-    claim.status = status
-    claim.decided_by = admin
-    claim.decided_at = timezone.now()
-    return claim
-
-
-@transaction.atomic
-def approve_claim(claim, admin):
-    claim = _decide(claim, admin, Claim.Status.APPROVED)
-    claim.pickup_code = _six_digit_code()
-    claim.save()
     notify(
-        claim.student,
-        f'Your claim for "{claim.item.title}" was approved. Your pickup code is on My claims.',
+        student,
+        f'You were approved to collect "{item.title}". Your pickup code is on Pickup codes. Tell it to the guard.',
         "/claims",
     )
+    return claim
 
 
 @transaction.atomic
-def reject_claim(claim, admin):
-    claim = _decide(claim, admin, Claim.Status.REJECTED)
+def cancel_approval(claim, admin):
+    """S18: an approval made by mistake can be cancelled until the code is used."""
+    claim = Claim.objects.select_for_update().select_related("item").get(pk=claim.pk)
+    if not claim.code_is_active:
+        raise ClaimError("This approval can no longer be cancelled.")
+    claim.status = Claim.Status.REJECTED
+    claim.decided_by = admin
+    claim.decided_at = timezone.now()
     claim.save()
     claim.item.status = FoundItem.Status.AVAILABLE
     claim.item.save(update_fields=["status"])
-    notify(claim.student, f'Your claim for "{claim.item.title}" was rejected.', "/claims")
+    # S27: the report is open again.
+    LostReport.objects.filter(linked_item=claim.item, student=claim.student).update(linked_item=None)
+    notify(claim.student, f'Your approval to collect "{claim.item.title}" was cancelled.', "/claims")
 
 
 @transaction.atomic

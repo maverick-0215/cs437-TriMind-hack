@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { useApi } from '../api'
 import { formatDate } from '../format'
-import type { Report } from '../types'
+import { REPORT_STATUS, type Report } from '../types'
 
 export default function ReportsPage() {
   const { data: reports, error } = useApi<Report[]>('reports')
@@ -27,9 +27,7 @@ export default function ReportsPage() {
                 {r.category} · lost {formatDate(r.date_lost)} · {r.place_lost}
               </p>
             </div>
-            <span className={`status ${r.linked_item ? 'claimed' : 'available'}`}>
-              {r.linked_item ? 'Matched' : 'Open'}
-            </span>
+            <span className={`status ${REPORT_STATUS[r.status].className}`}>{REPORT_STATUS[r.status].label}</span>
           </li>
         ))}
       </ul>

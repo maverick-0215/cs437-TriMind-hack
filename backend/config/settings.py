@@ -22,6 +22,8 @@ ALLOWED_EMAIL_DOMAIN = "iitgn.ac.in"
 # S2: comma-separated admin emails; everyone else is a student.
 ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+# S25: who students should contact about a matching found item.
+SECURITY_CONTACT = os.environ.get("SECURITY_CONTACT", "IITGN Security Office, Main Gate")
 # Development-only email login, for trying the app before a Google client ID exists.
 # It can only be switched on together with DEBUG.
 DEV_LOGIN = DEBUG and os.environ.get("DEV_LOGIN", "0") == "1"
@@ -68,3 +70,24 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
 }
+
+# S30: email for sign-up and password-reset codes. Without EMAIL_HOST, emails are printed
+# in the runserver terminal instead of sent, which is handy for trying the app.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+    EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+    EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "1") == "1"
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "IITGN Lost & Found <noreply@iitgn.ac.in>")
+
+# S29: same rules Django uses for admin passwords.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
+import { todayISO } from '../format'
 import { CATEGORIES, type Report } from '../types'
 
 export default function ReportNewPage() {
@@ -21,7 +22,7 @@ export default function ReportNewPage() {
   }
 
   return (
-    <>
+    <section className="form-page">
       <h1>File a lost report</h1>
       <form className="card stack" onSubmit={submit}>
         <label>
@@ -41,7 +42,7 @@ export default function ReportNewPage() {
         </label>
         <label>
           Date lost
-          <input name="date_lost" type="date" required />
+          <input name="date_lost" type="date" required max={todayISO()} />
         </label>
         <label>
           Place lost
@@ -55,6 +56,6 @@ export default function ReportNewPage() {
         {error && <p className="error">{error}</p>}
         <button>File report</button>
       </form>
-    </>
+    </section>
   )
 }

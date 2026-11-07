@@ -14,6 +14,14 @@ def _media(settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path / "media"
 
 
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    # Login lockouts live in the cache; start each test fresh.
+    from django.core.cache import cache
+
+    cache.clear()
+
+
 def _user(email):
     return get_user_model().objects.create_user(username=email, email=email)
 
