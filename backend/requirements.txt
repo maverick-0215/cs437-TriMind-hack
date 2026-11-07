@@ -6,3 +6,5 @@ Pillow>=11
 python-dotenv>=1.0,<2
 pytest>=8,<9
 pytest-django>=4.9,<5
+gunicorn>=23,<24
+whitenoise>=6.8,<7

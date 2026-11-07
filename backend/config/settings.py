@@ -16,6 +16,10 @@ if not SECRET_KEY:
 ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 # Where the React app is served from; its POSTs carry this Origin.
 CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "http://localhost:5173").split(",")
+# Azure App Service sets WEBSITE_HOSTNAME (e.g. iitgn-lostfound.azurewebsites.net).
+if AZURE_HOST := os.environ.get("WEBSITE_HOSTNAME"):
+    ALLOWED_HOSTS.append(AZURE_HOST)
+    CSRF_TRUSTED_ORIGINS.append(f"https://{AZURE_HOST}")
 
 # S1: only this domain can sign up or log in.
 ALLOWED_EMAIL_DOMAIN = "iitgn.ac.in"
@@ -38,6 +42,8 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves the built React app (FRONTEND_DIST) in production.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -48,10 +54,14 @@ MIDDLEWARE = [
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 
+# Where the database and photos live. On Azure this is /home/data, which survives
+# restarts and redeploys; locally it is the backend folder.
+DATA_DIR = Path(os.environ.get("DATA_DIR", BASE_DIR))
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": DATA_DIR / "db.sqlite3",
     }
 }
 
@@ -61,7 +71,30 @@ USE_I18N = True
 USE_TZ = True
 
 # Photos are private (S7): never served from a public URL, only through an admin endpoint.
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = DATA_DIR / "media"
+
+# The built React app (`npm run build`, copied here by the deploy workflow). Django serves
+# its files and sends index.html for every page that is not under /api/.
+FRONTEND_DIST = Path(os.environ.get("FRONTEND_DIST", BASE_DIR / "frontend_dist"))
+STATIC_URL = "static/"
+if FRONTEND_DIST.is_dir():
+    WHITENOISE_ROOT = FRONTEND_DIST
+    # Vite puts a content hash in every file under assets/, so browsers may cache them forever.
+    WHITENOISE_IMMUTABLE_FILE_TEST = r"^/assets/.+-[0-9A-Za-z_-]{8,}\.\w+$"
+
+# Production behind HTTPS (Azure terminates TLS and forwards the original scheme).
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# Send warnings and errors to the console, so they show in Azure's log stream.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": "WARNING"},
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
