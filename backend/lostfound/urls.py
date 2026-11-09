@@ -8,9 +8,6 @@ urlpatterns = [
     path("auth/me", auth_views.me),
     path("auth/google", auth_views.google_login),
     path("auth/dev-login", auth_views.dev_login),
-    path("auth/login", auth_views.password_login),
-    path("auth/password/code", auth_views.password_code),
-    path("auth/password/reset", auth_views.password_reset),
     path("auth/logout", auth_views.logout_view),
     # Everything below needs login.
     path("reports", views.reports),

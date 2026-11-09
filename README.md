@@ -36,7 +36,7 @@ backend/
     models.py        Found items, lost reports, approvals, handovers, notifications, admins
     services.py      Match scoring, approvals and handover logic
     views.py         API for students and admins
-    auth_views.py    Sign-in: password, emailed codes, Google, dev login
+    auth_views.py    Sign-in: Google (IITGN accounts only), dev login
     permissions.py   Who is an admin, who is a student
   tests/             One or more tests for every statement in SPEC.md
   startup.sh         Production start: migrations, then gunicorn
@@ -87,9 +87,13 @@ Open **http://localhost:5173** in your browser.
 
 ### 3. First sign-in
 
-1. On the sign-in page, click **New here? Create a password** and enter your `@iitgn.ac.in` email.
-2. Until email is set up (see below), the code is printed in the backend terminal. Copy it, choose a password, and sign in.
-3. Choose **Sign in as admin** if your email is in `ADMIN_EMAILS`, otherwise **Sign in as student**.
+Sign-in is with Google only, and only `@iitgn.ac.in` accounts are accepted. The app stores no passwords.
+
+1. Set `GOOGLE_CLIENT_ID` in `backend/.env` (see Configuration).
+2. On the sign-in page, choose **Sign in as admin** if your email is in `ADMIN_EMAILS`, otherwise **Sign in as student**.
+3. Click the Google button and pick your IITGN account.
+
+To try the app before a Google client ID exists, set `DEBUG=1` and `DEV_LOGIN=1`: you can then sign in by typing any `@iitgn.ac.in` email. Never turn it on where other people can reach the app.
 
 ## Configuration
 
@@ -101,8 +105,8 @@ Settings live in `backend/.env`. Start from `backend/.env.example`.
 | `DEBUG` | `1` while developing, `0` when the app is live. |
 | `ADMIN_EMAILS` | Comma-separated permanent admins (the security office). More admins can be added in the app. |
 | `SECURITY_CONTACT` | Shown to students next to matching items, for example the office location and phone number. |
-| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | The account that sends sign-up and forgot-password codes. Leave `EMAIL_HOST` empty to print emails in the backend terminal instead. |
-| `GOOGLE_CLIENT_ID` | Optional. Adds a "Sign in with Google" button. Create a Web client ID in Google Cloud Console and add `http://localhost:5173` as an authorized JavaScript origin. |
+| `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | The account that emails pickup codes and other notices. Leave `EMAIL_HOST` empty to print emails in the backend terminal instead. |
+| `GOOGLE_CLIENT_ID` | Required: sign-in is with Google only. Create a Web client ID in Google Cloud Console and add `http://localhost:5173` as an authorized JavaScript origin. |
 | `DEV_LOGIN` | Development only. `1` lets anyone sign in by typing an email, with no password. Works only with `DEBUG=1`. Keep it `0` whenever other people can reach the app. |
 | `CSRF_TRUSTED_ORIGINS` | The address the frontend is served from. Defaults to the Vite dev server. |
 | `ALLOWED_HOSTS` | Domain names the site answers to. Defaults to `localhost`. |
@@ -131,7 +135,8 @@ npm run build     # type check and production build
 ## Before going live
 
 - Set `DEBUG=0`, `DEV_LOGIN=0` and a long random `SECRET_KEY`.
-- Set up real email so students receive their codes.
+- Set up real email so students receive their pickup codes.
+- In Google Cloud Console, add the site's address under the client ID's authorized JavaScript origins, and set the OAuth consent screen to **In production**.
 - On Azure, set `DATA_DIR=/home/data`, or the database is lost on every deploy.
 - Put the real security office emails in `ADMIN_EMAILS` and the real contact details in `SECURITY_CONTACT`.
 - Never commit `backend/.env`. It is already in `.gitignore`.
