@@ -262,3 +262,52 @@ def test_wrong_code_sends_no_collection_email(approved_item, admin_client, djang
     with django_capture_on_commit_callbacks(execute=True):
         assert _hand_over(admin_client, approved_item, "000000").status_code == 400
     assert mail.outbox == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_S27_one_report_cannot_be_approved_for_two_items_at_once(
+    make_item, make_report, admin_user, student, monkeypatch
+):
+    """Issue #19: two admins approve the same report for different items at the same moment."""
+    import threading
+
+    from django.db import connection
+
+    from lostfound.models import LostReport
+    from lostfound.serializers import ApproveSerializer
+
+    from .conftest import _client
+
+    first, second = make_item(), make_item(title="Black phone again")
+    report = make_report()
+
+    # Both requests read the report before either approval is saved.
+    both_read = threading.Barrier(2, timeout=10)
+    validate = ApproveSerializer.validate
+
+    def validate_then_wait(self, data):
+        data = validate(self, data)
+        both_read.wait()
+        return data
+
+    monkeypatch.setattr(ApproveSerializer, "validate", validate_then_wait)
+
+    codes = []
+
+    def approve(item):
+        try:
+            codes.append(_approve(_client(admin_user), item, report_id=report.pk).status_code)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=approve, args=(item,)) for item in (first, second)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert sorted(codes) == [204, 409]
+    assert Claim.objects.filter(student=student, status=Claim.Status.APPROVED).count() == 1
+    approved = Claim.objects.get(student=student).item
+    assert LostReport.objects.get(pk=report.pk).linked_item == approved
+    assert FoundItem.objects.exclude(pk=approved.pk).get().status == FoundItem.Status.AVAILABLE
