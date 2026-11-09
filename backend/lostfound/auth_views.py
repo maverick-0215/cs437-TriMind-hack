@@ -4,7 +4,10 @@ S1: people sign in with their IITGN Google account. There are no passwords in th
 """
 
 import json
+import threading
+import time
 
+import requests
 from django.conf import settings
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.hashers import make_password
@@ -82,9 +85,48 @@ def me(request):
     return JsonResponse(_user_json(request.user))
 
 
+class _CachingGoogleRequest:
+    """How we fetch Google's public signing keys, which every sign-in is checked against.
+    Fetching them on each sign-in made sign-in slower; they change rarely, so keep them
+    for an hour and reuse one connection to Google."""
+
+    KEEP_SECONDS = 3600
+
+    def __init__(self):
+        self._request = google_requests.Request(session=requests.Session())
+        self._lock = threading.Lock()
+        self._kept = {}  # url -> (keep until, response)
+
+    def __call__(self, url, method="GET", **kwargs):
+        if method == "GET":
+            with self._lock:
+                kept = self._kept.get(url)
+            if kept and kept[0] > time.monotonic():
+                return kept[1]
+        response = self._request(url, method=method, **kwargs)
+        if method == "GET" and response.status == 200:
+            with self._lock:
+                self._kept[url] = (time.monotonic() + self.KEEP_SECONDS, response)
+        return response
+
+    def forget(self):
+        with self._lock:
+            self._kept.clear()
+
+
+_google_request = _CachingGoogleRequest()
+
+
 def verify_google_token(credential):
     """Return the claims of a Google ID token after checking its signature and audience."""
-    return id_token.verify_oauth2_token(credential, google_requests.Request(), settings.GOOGLE_CLIENT_ID)
+    try:
+        return id_token.verify_oauth2_token(credential, _google_request, settings.GOOGLE_CLIENT_ID)
+    except ValueError as error:
+        if "Certificate for key id" not in str(error):
+            raise
+        # Signed with a key we have not kept yet: Google switched keys. Fetch fresh ones once.
+        _google_request.forget()
+        return id_token.verify_oauth2_token(credential, _google_request, settings.GOOGLE_CLIENT_ID)
 
 
 @require_POST
