@@ -162,11 +162,12 @@ def approve_owner(item, student, admin, report=None):
     if report is None:
         own = [(r, s) for r, s in matching_reports(item) if r.student_id == student.pk]
         report = own[0][0] if own else None
-    elif report.linked_item_id is not None:
+    # Link the report only if it is still open, checked on the saved row: the copy in hand
+    # was read earlier, and another approval may have linked it since (issue #19).
+    if report is not None and not LostReport.objects.filter(pk=report.pk, linked_item__isnull=True).update(
+        linked_item=item
+    ):
         raise ClaimError("That lost report is already approved for another item or closed.")
-    if report is not None:
-        report.linked_item = item
-        report.save(update_fields=["linked_item"])
     claim = Claim.objects.create(
         item=item,
         student=student,
