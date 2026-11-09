@@ -121,16 +121,3 @@ class AdminEmail(models.Model):
     def save(self, *args, **kwargs):
         self.email = self.email.strip().lower()
         super().save(*args, **kwargs)
-
-
-class PasswordCode(models.Model):
-    """S30: a one-time code emailed to set or reset a password. Only its hash is stored."""
-
-    email = models.EmailField(db_index=True)
-    code_hash = models.CharField(max_length=128)
-    created_at = models.DateTimeField(auto_now_add=True)
-    attempts = models.PositiveSmallIntegerField(default=0)
-    used = models.BooleanField(default=False)
-
-    class Meta:
-        ordering = ["-created_at"]

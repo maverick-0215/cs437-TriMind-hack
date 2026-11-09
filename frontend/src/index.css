@@ -498,14 +498,6 @@ button.link:disabled:hover {
   text-decoration: none;
   opacity: 1;
 }
-/* A problem with one field, shown right under it. */
-.field-error {
-  color: var(--err);
-  font-weight: 600;
-}
-input[aria-invalid='true'] {
-  border-color: var(--err);
-}
 button.link:hover {
   background: none;
   color: var(--accent-hover);
@@ -600,16 +592,6 @@ form.stack > button:not(.link) {
 .login-card form.stack > button:not(.link) {
   align-self: stretch;
   padding: 9px 16px;
-}
-.login-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 14px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  font-size: 0.9rem;
 }
 .login-alt {
   margin-top: 16px;

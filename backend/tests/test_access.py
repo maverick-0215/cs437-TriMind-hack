@@ -101,10 +101,7 @@ def test_S3_admin_route_check_covers_all_admin_routes():
     assert len(_api_urls("admin/")) == 10
 
 
-OPEN_TO_VISITORS = {
-    "/api/auth/config", "/api/auth/google", "/api/auth/dev-login", "/api/auth/logout",
-    "/api/auth/login", "/api/auth/password/code", "/api/auth/password/reset",
-}
+OPEN_TO_VISITORS = {"/api/auth/config", "/api/auth/google", "/api/auth/dev-login", "/api/auth/logout"}
 
 
 @pytest.mark.django_db
@@ -171,3 +168,19 @@ def test_pages_outside_api_get_the_react_app(anon, settings, tmp_path):
         assert response.status_code == 200 and b"id=root" in b"".join(response.streaming_content)
     # The API is untouched.
     assert anon.get("/api/reports").status_code == 401
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("path", ["auth/login", "auth/password/code", "auth/password/reset"])
+def test_S1_there_is_no_password_sign_in(anon, path):
+    # Issue #17: sign-in is through Google only, so there are no passwords or reset codes to attack.
+    response = anon.post(f"/api/{path}", {"email": "asha@iitgn.ac.in", "password": "x", "code": "123456"}, format="json")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_S1_google_accounts_have_no_password(anon, google):
+    _google_login(anon, "new.student@iitgn.ac.in")
+    user = get_user_model().objects.get(username="new.student@iitgn.ac.in")
+    assert not user.has_usable_password()
+

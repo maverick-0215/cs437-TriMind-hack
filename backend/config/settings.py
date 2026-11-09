@@ -85,14 +85,6 @@ if DATABASE_URL := os.environ.get("DATABASE_URL"):
 
     DATABASES["default"] = dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True)
 
-# Shared by every server process (unlike the default per-process memory cache), so the
-# wrong-password lockout (S29) counts tries from all of them. Created by startup.sh.
-CACHES = {
-    "default": {
-        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
-        "LOCATION": "django_cache",
-    }
-}
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Kolkata"
@@ -154,10 +146,3 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "IITGN Lost & Found <n
 # Give up on a mail server that does not answer instead of hanging the request.
 EMAIL_TIMEOUT = 15
 
-# S29: same rules Django uses for admin passwords.
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
