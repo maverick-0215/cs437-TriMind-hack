@@ -51,6 +51,11 @@ jobs:
 
   deploy:
     needs: test
+    # One deploy at a time: Azure rejects a deploy that starts while another is running
+    # (409 Conflict). A newer push waits instead, and replaces any older one still waiting.
+    concurrency:
+      group: azure-deploy
+      cancel-in-progress: false
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.AZURE_WEBAPP_NAME != ''
     runs-on: ubuntu-24.04
     environment:
