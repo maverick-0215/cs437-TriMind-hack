@@ -20,16 +20,21 @@ export default function LoginPage() {
   const [role, setRole] = useState<Role>('student')
   const [devEmail, setDevEmail] = useState('')
   const [error, setError] = useState<string | null>(null)
+  // Between Google handing back the account and the server answering: show it, and keep
+  // the student/admin choice fixed so the answer matches what is on screen.
+  const [signingIn, setSigningIn] = useState(false)
 
   const logIn = useCallback(
     async (path: string, body: object) => {
       setError(null)
+      setSigningIn(true)
       try {
         // S24: the backend checks the chosen role against the admin list.
         await api(path, { method: 'POST', body: { ...body, role } })
         await refresh()
       } catch (e) {
         setError((e as Error).message)
+        setSigningIn(false)
       }
     },
     [refresh, role],
@@ -74,6 +79,7 @@ export default function LoginPage() {
               role="tab"
               aria-selected={role === r.role}
               className={role === r.role ? 'active' : 'secondary'}
+              disabled={signingIn}
               onClick={() => pick(r.role)}
             >
               {r.label}
@@ -102,6 +108,7 @@ export default function LoginPage() {
           </form>
         )}
 
+        {signingIn && <p className="info">Signing you in as {role === 'admin' ? 'an admin' : 'a student'}…</p>}
         {error && <p className="error">{error}</p>}
       </div>
       <p className="login-note">Run by the Security Office, IIT Gandhinagar</p>

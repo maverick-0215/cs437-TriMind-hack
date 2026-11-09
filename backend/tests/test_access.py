@@ -184,3 +184,20 @@ def test_S1_google_accounts_have_no_password(anon, google):
     user = get_user_model().objects.get(username="new.student@iitgn.ac.in")
     assert not user.has_usable_password()
 
+def test_google_signing_keys_are_kept_for_an_hour(monkeypatch):
+    """Faster sign-in: Google's public keys are fetched once, not on every sign-in."""
+    from lostfound.auth_views import _CachingGoogleRequest
+
+    class Reply:
+        status = 200
+        data = b"{}"
+
+    calls = []
+    keys = _CachingGoogleRequest()
+    monkeypatch.setattr(keys, "_request", lambda url, method="GET", **kw: calls.append(url) or Reply())
+    for _ in range(3):
+        keys("https://www.googleapis.com/oauth2/v1/certs")
+    assert len(calls) == 1
+    keys.forget()  # e.g. Google switched keys
+    keys("https://www.googleapis.com/oauth2/v1/certs")
+    assert len(calls) == 2

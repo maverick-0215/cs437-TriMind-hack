@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppRoutes } from './App'
@@ -228,4 +228,46 @@ it('S1: the sign-in page offers Google sign-in only, with no password or code fo
   expect(screen.queryByLabelText('Password')).toBeNull()
   expect(screen.queryByText('Forgot password?')).toBeNull()
   expect(screen.queryByText(/Create a password/)).toBeNull()
+})
+
+it('S24: Google sign-in sends the chosen role, shows "Signing you in", then explains a refusal', async () => {
+  const sent: { role?: string }[] = []
+  let googleCallback: ((r: { credential: string }) => void) | null = null
+  let answer: (r: Response) => void = () => {}
+  ;(window as unknown as { google: unknown }).google = {
+    accounts: {
+      id: {
+        initialize: (o: { callback: typeof googleCallback }) => (googleCallback = o.callback),
+        renderButton: () => {},
+      },
+    },
+  }
+  vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json({ detail: 'Not logged in.' }, 401)
+    if (url === '/api/auth/config') return json({ google_client_id: 'cid', dev_login: false })
+    if (url === '/api/auth/google') {
+      sent.push(JSON.parse(String(init?.body)))
+      return new Promise<Response>((resolve) => (answer = resolve))
+    }
+    return json([])
+  })
+  renderAt('/login')
+  await screen.findByText(/Google account/)
+  fireEvent.click(screen.getByRole('tab', { name: 'Sign in as admin' }))
+  // Google's script "loads", then Google hands back the account.
+  await act(async () => document.head.querySelectorAll('script').forEach((s) => s.dispatchEvent(new Event('load'))))
+  // Hand back the account without waiting: the server's answer is held back on purpose.
+  act(() => {
+    googleCallback!({ credential: 'token' })
+  })
+  await act(async () => {})
+  expect(sent.map((b) => b.role)).toEqual(['admin'])
+  expect(screen.getByText('Signing you in as an admin…')).toBeTruthy()
+  expect((screen.getByRole('tab', { name: 'Sign in as student' }) as HTMLButtonElement).disabled).toBe(true)
+  await act(async () =>
+    answer(new Response(JSON.stringify({ detail: 'This account is not a security office admin.' }), { status: 403 })),
+  )
+  expect(await screen.findByText('This account is not a security office admin.')).toBeTruthy()
+  expect(screen.queryByText(/Signing you in/)).toBeNull()
 })
