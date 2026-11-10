@@ -141,6 +141,13 @@ def google_login(request):
     # Only trust addresses Google has verified the person owns.
     if not claims.get("email_verified"):
         return JsonResponse({"detail": "Your Google email is not verified."}, status=403)
+    # S1: only accounts IITGN's Google Workspace manages. A personal Google account made with
+    # an IITGN address has the right email but no "hd", and keeps working after IITGN disables
+    # the real one, so the email alone is not enough.
+    if claims.get("hd") != settings.ALLOWED_EMAIL_DOMAIN:
+        return JsonResponse(
+            {"detail": "Sign in with your IITGN Google account, not a personal Google account."}, status=403
+        )
     return _log_in(request, claims["email"].lower(), claims.get("name", ""), body.get("role"))
 
 
