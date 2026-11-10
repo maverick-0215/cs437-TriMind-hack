@@ -9,13 +9,18 @@ from .conftest import ADMIN_EMAIL
 
 @pytest.fixture
 def google(monkeypatch):
-    """Stand in for Google: the token string is the email it vouches for."""
+    """Stand in for Google: the token string is the email it vouches for. Like real Google,
+    a Workspace account carries its hosted domain in "hd"; "|personal" is a personal Google
+    account registered with that email, which has no "hd"."""
 
     def verify(credential):
         if credential == "bad-token":
             raise ValueError("invalid token")
         email, _, flag = credential.partition("|")
-        return {"email": email, "email_verified": flag != "unverified", "name": "Test"}
+        claims = {"email": email, "email_verified": flag != "unverified", "name": "Test"}
+        if flag != "personal":
+            claims["hd"] = email.rpartition("@")[2].lower()
+        return claims
 
     monkeypatch.setattr("lostfound.auth_views.verify_google_token", verify)
 
@@ -46,6 +51,17 @@ def test_S1_iitgn_google_account_can_sign_up_and_log_in(anon, google):
 )
 def test_S1_other_domains_are_rejected(anon, google, email):
     assert _google_login(anon, email).status_code == 403
+    assert _users() == set()
+    assert anon.get("/api/auth/me").status_code == 401
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("email", ["new.student@iitgn.ac.in", ADMIN_EMAIL])
+def test_S1_personal_google_account_with_iitgn_email_is_rejected(anon, google, email):
+    """A personal Google account made with an IITGN address has no hd: IITGN does not manage it."""
+    response = _google_login(anon, f"{email}|personal")
+    assert response.status_code == 403
+    assert "IITGN Google account" in response.json()["detail"]
     assert _users() == set()
     assert anon.get("/api/auth/me").status_code == 401
 
