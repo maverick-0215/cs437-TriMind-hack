@@ -49,6 +49,8 @@ class LostReport(models.Model):
     date_lost = models.DateField()
     place_lost = models.CharField(max_length=200)
     private_details = models.TextField()
+    # S33: optional, private like private_details: only the student and admins see it.
+    photo = models.ImageField(upload_to="report_photos/", blank=True)
     linked_item = models.ForeignKey(
         FoundItem, null=True, blank=True, on_delete=models.SET_NULL, related_name="linked_reports"
     )
@@ -76,6 +78,8 @@ class Claim(models.Model):
     # S17: shown only to the claiming student. S20: works once.
     pickup_code = models.CharField(max_length=6, blank=True)
     code_used_at = models.DateTimeField(null=True, blank=True)
+    # S19: wrong codes tried for this approval; after MAX_CODE_TRIES every code is refused.
+    wrong_code_tries = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         ordering = ["-created_at"]

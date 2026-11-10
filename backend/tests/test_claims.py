@@ -311,3 +311,32 @@ def test_S27_one_report_cannot_be_approved_for_two_items_at_once(
     approved = Claim.objects.get(student=student).item
     assert LostReport.objects.get(pk=report.pk).linked_item == approved
     assert FoundItem.objects.exclude(pk=approved.pk).get().status == FoundItem.Status.AVAILABLE
+
+
+@pytest.mark.django_db
+def test_S19_sixth_wrong_code_is_refused_even_if_the_next_is_right(approved_item, admin_client):
+    for _ in range(5):
+        assert _hand_over(admin_client, approved_item, "111111").status_code == 400
+    sixth = _hand_over(admin_client, approved_item, "222222")
+    assert sixth.status_code == 400 and "Too many wrong codes" in sixth.json()["detail"]
+    assert _hand_over(admin_client, approved_item, CODE).status_code == 400
+    approved_item.refresh_from_db()
+    assert approved_item.status == FoundItem.Status.CLAIMED
+    assert not Handover.objects.exists()
+
+
+@pytest.mark.django_db
+def test_S19_right_code_after_a_few_wrong_ones_still_works(approved_item, admin_client):
+    for _ in range(4):
+        _hand_over(admin_client, approved_item, "111111")
+    assert _hand_over(admin_client, approved_item, CODE).status_code == 201
+
+
+@pytest.mark.django_db
+def test_S19_cancel_and_approve_again_gives_fresh_tries(approved_item, admin_client, student):
+    for _ in range(5):
+        _hand_over(admin_client, approved_item, "111111")
+    claim = approved_item.claims.get()
+    assert admin_client.post(f"/api/admin/claims/{claim.pk}/cancel").status_code == 204
+    _approve(admin_client, approved_item, email=student.email)
+    assert _hand_over(admin_client, approved_item, CODE).status_code == 201

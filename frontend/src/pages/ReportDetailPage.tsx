@@ -26,6 +26,7 @@ export default function ReportDetailPage() {
         <dt>Identifying details</dt>
         <dd className="pre">{report.private_details}</dd>
       </dl>
+      {report.has_photo && <img className="photo" src={`/api/reports/${report.id}/photo`} alt={`Photo of ${report.title}`} />}
 
       {/* S27: once approved or collected, the report needs no more matches. */}
       {report.status === 'CLOSED' && report.item && (

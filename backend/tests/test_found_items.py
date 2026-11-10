@@ -144,3 +144,18 @@ def test_S6_found_items_list_shows_what_where_and_who(student_client, make_item,
     # S7: public fields only.
     assert set(first) == {"id", "category", "title", "date_found", "general_area", "contact"}
     assert "SECRET" not in str(body)
+
+
+def _big_png(megabytes):
+    """A real PNG padded past `megabytes`, so only its size is wrong."""
+    return SimpleUploadedFile(
+        "big.png", _png().read() + b"\0" * (megabytes * 1024 * 1024), content_type="image/png"
+    )
+
+
+@pytest.mark.django_db
+def test_S4_photo_over_5_mb_is_rejected(admin_client):
+    response = admin_client.post("/api/admin/items", {**NEW_ITEM, "photo": _big_png(6)}, format="multipart")
+    assert response.status_code == 400
+    assert "5 MB" in str(response.json())
+    assert not FoundItem.objects.exists()

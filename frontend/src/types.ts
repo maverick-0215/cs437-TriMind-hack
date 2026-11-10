@@ -50,6 +50,8 @@ export type Report = {
   date_lost: string
   place_lost: string
   private_details: string
+  // S33: an optional photo, served by /api/reports/<id>/photo to the student and admins only.
+  has_photo: boolean
   created_at: string
   // S27: OPEN, APPROVED (waiting for pickup) or CLOSED (collected).
   status: ReportStatus

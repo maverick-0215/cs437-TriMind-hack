@@ -25,7 +25,7 @@ Each statement has at least one automated test that names its ID.
 
 ### Found items
 
-- **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo.
+- **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo. A photo must be an image of at most 5 MB; anything else is rejected.
 - **S5.** A new found item has status `AVAILABLE`.
 - **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact.
 - **S7.** Students never see a found item's private details (exact location, description, photo) anywhere in the app or its API.
@@ -37,6 +37,7 @@ Each statement has at least one automated test that names its ID.
 - **S11.** A student can file a lost report with a category, title, date lost, place lost and private identifying details.
 - **S12.** A student can see only their own lost reports. Opening another student's report returns 403 or 404.
 - **S25.** A student's lost report shows every `AVAILABLE` found item that matches it by at least 60% (S13), best match first, with the match percentage, where it was found (general area) and who to meet. It never shows private details. If there are none, the page says no such item is here yet and that they will be notified.
+- **S33.** A student can add an optional photo to a lost report, with the same limits as a found item's photo (S4). Like the identifying details, only that student and admins can see it; admins see it next to the report when it matches a found item.
 
 ### Matching
 
@@ -51,7 +52,7 @@ Students do not claim items in the app. They see a match, go to the security off
 - **S16.** On a found item's page, an admin sees the students whose lost reports match it, with their identifying details, next to the item's private details. After checking a student in person, the admin can approve them, or approve any `@iitgn.ac.in` email. The item becomes `CLAIMED`. Only `AVAILABLE` items can be approved, and admins cannot be approved.
 - **S17.** Approval creates a 6-digit pickup code that only the approved student can see. It is emailed to them (so someone approved by email who has not signed in yet still gets it) and shown on their Pickup codes page; it never appears to admins or in an in-app notification. If the email fails, the approval still stands.
 - **S18.** An admin can cancel an approval until its code is used. The item goes back to `AVAILABLE` and the student is notified in the app and by email.
-- **S19.** An item becomes `RETURNED` only when the correct pickup code is entered. A wrong code is rejected and the status does not change.
+- **S19.** An item becomes `RETURNED` only when the correct pickup code is entered. A wrong code is rejected and the status does not change. After 5 wrong codes for one approval, every code is refused, even the right one, until the admin cancels the approval and approves the student again, which sends a new code.
 - **S20.** A pickup code works only once.
 - **S27.** An approval is tied to the student's lost report: the one the admin approved from, or else the student's best open matching report. The report then shows as approved, and once the item is collected it shows as **Closed** with the collection date. A cancelled approval reopens it. Approved and closed reports get no more matches, suggestions or notifications.
 

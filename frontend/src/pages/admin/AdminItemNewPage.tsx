@@ -68,7 +68,7 @@ export default function AdminItemNewPage() {
           <textarea name="description" required rows={3} />
         </label>
         <label>
-          Photo (optional)
+          Photo (optional, up to 5 MB)
           <input name="photo" type="file" accept="image/*" />
         </label>
         {error && <p className="error">{error}</p>}

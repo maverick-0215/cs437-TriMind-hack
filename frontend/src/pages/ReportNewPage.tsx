@@ -18,10 +18,10 @@ export default function ReportNewPage() {
     setIsSaving(true)
     setError(null)
     try {
-      const report = await api<Report>('reports', {
-        method: 'POST',
-        body: Object.fromEntries(new FormData(event.currentTarget)),
-      })
+      // FormData, not JSON, so the optional photo (S33) can go with it.
+      const form = new FormData(event.currentTarget)
+      if (!(form.get('photo') as File | null)?.size) form.delete('photo')
+      const report = await api<Report>('reports', { method: 'POST', body: form })
       navigate(`/reports/${report.id}`)
     } catch (e) {
       setError((e as Error).message)
@@ -61,6 +61,11 @@ export default function ReportNewPage() {
           Identifying details
           <small className="muted">Marks, stickers, contents, serial number… Only you and the security office see this.</small>
           <textarea name="private_details" required rows={4} />
+        </label>
+        <label>
+          Photo (optional, up to 5 MB)
+          <small className="muted">A photo of the item, if you have one. Only you and the security office see it.</small>
+          <input name="photo" type="file" accept="image/*" />
         </label>
         {error && <p className="error">{error}</p>}
         <button disabled={isSaving}>{isSaving ? 'Saving…' : 'File report'}</button>

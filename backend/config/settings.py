@@ -45,6 +45,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    # First, so files WhiteNoise serves get the header too.
+    "config.csp.ContentSecurityPolicyMiddleware",
     "django.middleware.security.SecurityMiddleware",
     # Serves the built React app (FRONTEND_DIST) in production.
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -106,6 +108,23 @@ if FRONTEND_DIST.is_dir():
 # Django's default ("same-origin") cuts the page off from the "Sign in with Google" popup,
 # which then stays blank forever. Google's docs ask for this value instead.
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+
+# Only our own files, plus what "Sign in with Google" needs (its script, button iframe and
+# styles; https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid#cross_origin_opener_policy_and_content_security_policy).
+# No inline or eval'd scripts, no plugins, and no other site may frame us.
+GSI = "https://accounts.google.com/gsi/"
+CONTENT_SECURITY_POLICY = {
+    "default-src": ["'self'"],
+    "script-src": ["'self'", GSI + "client"],
+    "style-src": ["'self'", GSI + "style"],
+    "frame-src": [GSI],
+    "connect-src": ["'self'", GSI],
+    "img-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"],
+    "frame-ancestors": ["'none'"],
+}
 
 # Production behind HTTPS (Azure terminates TLS and forwards the original scheme).
 if not DEBUG:

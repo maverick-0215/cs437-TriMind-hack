@@ -8,7 +8,7 @@ from rest_framework.response import Response
 
 from . import services
 from .auth_views import get_or_create_user
-from .models import AdminEmail, Claim, FoundItem, Handover
+from .models import AdminEmail, Claim, FoundItem, Handover, LostReport
 from .permissions import IsAdmin, IsStudent, email_allowed, is_admin, is_admin_email
 from .serializers import (
     AdminClaimSerializer,
@@ -91,6 +91,17 @@ def report_detail(request, pk):
             "security_contact": settings.SECURITY_CONTACT,
         }
     )
+
+
+@api_view(["GET"])
+def report_photo(request, pk):
+    """S33: a lost report's photo, for the student who filed it and for admins only.
+    Not under admin/: students need it too. Anyone else gets 404 (S12)."""
+    reports = LostReport.objects.all() if is_admin(request.user) else request.user.lost_reports.all()
+    report = get_object_or_404(reports, pk=pk)
+    if not report.photo:
+        raise Http404
+    return FileResponse(report.photo.open("rb"))
 
 
 @api_view(["GET"])
