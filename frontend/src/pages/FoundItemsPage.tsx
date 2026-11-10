@@ -2,7 +2,7 @@ import { useApi } from '../api'
 import { formatDate } from '../format'
 import type { FoundList } from '../types'
 
-/** S6: every found item at the security office, with where it was found and who to contact. */
+/** S6: every found item at the security office, with where it was found. Students contact the office. */
 export default function FoundItemsPage() {
   const { data, error } = useApi<FoundList>('items')
 
@@ -11,7 +11,7 @@ export default function FoundItemsPage() {
       <h1>Found items</h1>
       <p className="muted">
         Items currently held at the security office. If one is yours, go to the security office
-        {data && <> ({data.security_contact})</>} and meet the person listed.
+        {data && <> ({data.security_contact})</>}.
       </p>
 
       {error && <p className="error">{error}</p>}
@@ -25,8 +25,6 @@ export default function FoundItemsPage() {
             </p>
             <p>
               <strong>Found at:</strong> {item.general_area}
-              <br />
-              <strong>Contact:</strong> <a href={`mailto:${item.contact}`}>{item.contact}</a>
             </p>
           </li>
         ))}

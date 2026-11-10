@@ -62,8 +62,8 @@ def test_S25_report_shows_items_matching_60_percent_with_contact(student_client,
     assert [(m["title"], m["score"]) for m in body["matches"]] == [("Black phone", 100), ("Phone", 85)]
     match = body["matches"][0]
     assert match["general_area"] == "Library"
-    assert match["contact"] == admin_user.email
     assert body["security_contact"]
+    assert admin_user.email not in str(body)
     # S7 still holds: no private item details.
     assert "SECRET" not in str(body)
 

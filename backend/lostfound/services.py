@@ -106,26 +106,24 @@ def match_score(report, item):
     score += 30 * _overlap(report.title, f"{item.title} {item.category}")
     score += 15 * _overlap(report.place_lost, item.general_area)
     days = (item.date_found - report.date_lost).days
-    if 0 <= days <= 7:
+    if -1 <= days <= 7:  # a day early still counts: students often get the date off by one
         score += 15
     elif 0 <= days <= 30:
         score += 8
     elif days > 30:
         score += 3
-    # Found before it was lost (more than a day early) earns nothing for date.
+    # Found more than a day before it was lost earns nothing for date.
     return round(min(score, 100))
 
 
 def available_items():
     """S6: every found item still at the security office, newest first."""
-    return FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).select_related("added_by").order_by(
-        "-date_found", "-created_at"
-    )
+    return FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).order_by("-date_found", "-created_at")
 
 
 def matching_items(report):
     """S25: AVAILABLE items matching the report by at least MATCH_THRESHOLD, best first."""
-    items = FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE).select_related("added_by")
+    items = FoundItem.objects.filter(status=FoundItem.Status.AVAILABLE)
     scored = [(item, match_score(report, item)) for item in items]
     return sorted([m for m in scored if m[1] >= MATCH_THRESHOLD], key=lambda m: (-m[1], -m[0].pk))
 

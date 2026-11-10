@@ -139,11 +139,28 @@ def test_S6_found_items_list_shows_what_where_and_who(student_client, make_item,
     assert [i["title"] for i in body["items"]] == ["Newer bottle", "Older umbrella"]
     first = body["items"][0]
     assert (first["category"], first["date_found"], first["general_area"]) == ("Bottle", "2026-10-09", "Mess")
-    assert first["contact"] == admin_user.email
     assert body["security_contact"]
+    assert admin_user.email not in str(body)
     # S7: public fields only.
-    assert set(first) == {"id", "category", "title", "date_found", "general_area", "contact"}
+    assert set(first) == {"id", "category", "title", "date_found", "general_area"}
     assert "SECRET" not in str(body)
+
+
+@pytest.mark.django_db
+def test_S6_students_never_see_the_email_of_an_admin_added_in_the_app(student_client, make_item, make_report):
+    from datetime import date
+
+    from django.contrib.auth import get_user_model
+
+    # S28: an admin added from the Admins page, who may not expect students to see their address.
+    added_admin = get_user_model().objects.create_user(username="newguard@iitgn.ac.in", email="newguard@iitgn.ac.in")
+    make_item(added_by=added_admin)
+    report = make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 9))
+
+    found_list = student_client.get("/api/items").json()
+    report_page = student_client.get(f"/api/reports/{report.pk}").json()
+    assert len(found_list["items"]) == 1 and len(report_page["matches"]) == 1
+    assert added_admin.email not in str(found_list) + str(report_page)
 
 
 def _big_png(megabytes):

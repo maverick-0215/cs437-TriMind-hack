@@ -27,7 +27,7 @@ Each statement has at least one automated test that names its ID.
 
 - **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo. A photo must be an image of at most 5 MB; anything else is rejected.
 - **S5.** A new found item has status `AVAILABLE`.
-- **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact.
+- **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact: the security office (`SECURITY_CONTACT`), never an admin's own email.
 - **S7.** Students never see a found item's private details (exact location, description, photo) anywhere in the app or its API.
 - **S31.** The date found and the date lost cannot be after today. The date pickers do not offer future dates, and the API rejects them.
 - **S32.** Sending the same lost report or found item again within 2 minutes (a double click, or a retry on a slow connection) does not create a copy. The one already saved is returned, and nobody is notified twice. The form's button is disabled while it saves.
@@ -41,7 +41,7 @@ Each statement has at least one automated test that names its ID.
 
 ### Matching
 
-- **S13.** A lost report and a found item get a match score from 0 to 100% using only the item's public fields: same category (40), shared words in the title and category (up to 30), shared words in the place lost and general area (up to 15), and how soon after the lost date the item was found (up to 15). Items found before the lost date get nothing for date. A score of 60% or more is a match.
+- **S13.** A lost report and a found item get a match score from 0 to 100% using only the item's public fields: same category (40), shared words in the title and category (up to 30), shared words in the place lost and general area (up to 15), and how soon after the lost date the item was found (up to 15). Items found one day before the lost date still get full date points, since students often get the date off by one; items found earlier get nothing for date. A score of 60% or more is a match.
 - **S26.** When an admin adds a found item, every student with a lost report that matches it gets an in-app notification. No one else does.
 
 ### Approval and handover
