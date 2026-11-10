@@ -16,7 +16,7 @@ Each statement has at least one automated test that names its ID.
 
 ### Access
 
-- **S1.** People sign in with their Google account; the app has no passwords. Only verified `@iitgn.ac.in` Google accounts can sign up or log in. Other accounts are rejected.
+- **S1.** People sign in with their Google account; the app has no passwords. Only verified `@iitgn.ac.in` Google accounts that IITGN's Google Workspace manages (hosted domain `iitgn.ac.in`) can sign up or log in. Other accounts are rejected, including a personal Google account made with an IITGN address.
 - **S2.** A user whose email is in `ADMIN_EMAILS` (set in `.env`) or was added by an admin (S28) is an admin. Every other user is a student.
 - **S3.** A student gets 403 on every admin page and admin API route.
 - **S23.** A visitor who is not logged in sees only the login and sign-up pages. Every other page sends them to the login page, and every other API route returns 401.
