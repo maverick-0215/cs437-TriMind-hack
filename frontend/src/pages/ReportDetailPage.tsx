@@ -49,7 +49,7 @@ export default function ReportDetailPage() {
       ) : (
         <>
           <p className="muted">
-            If one of these is yours, go to the security office ({report.security_contact}) and meet the person listed.
+            If one of these is yours, go to the security office ({report.security_contact}).
             They will check the item with you and approve you, and your pickup code will appear on{' '}
             <strong>Pickup codes</strong>.
           </p>
@@ -63,9 +63,6 @@ export default function ReportDetailPage() {
                   </p>
                   <p>
                     <strong>Found at:</strong> {item.general_area}
-                    <br />
-                    <strong>Meet:</strong> <a href={`mailto:${item.contact}`}>{item.contact}</a>,{' '}
-                    {report.security_contact}
                   </p>
                 </div>
                 <span className="status available">{item.score}% match</span>

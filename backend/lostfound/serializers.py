@@ -29,15 +29,6 @@ class PublicItemSerializer(serializers.ModelSerializer):
         fields = ["id", "category", "title", "date_found", "general_area"]
 
 
-class MatchItemSerializer(PublicItemSerializer):
-    """S25: a found item matching a student's report, plus who to contact. Still no private details."""
-
-    contact = serializers.EmailField(source="added_by.email", read_only=True)
-
-    class Meta(PublicItemSerializer.Meta):
-        fields = PublicItemSerializer.Meta.fields + ["contact"]
-
-
 class AdminItemSerializer(serializers.ModelSerializer):
     photo = serializers.ImageField(write_only=True, required=False, validators=[photo_not_too_big])
     has_photo = serializers.SerializerMethodField()

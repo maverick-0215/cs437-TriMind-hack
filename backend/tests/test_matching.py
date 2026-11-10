@@ -32,6 +32,16 @@ def test_S13_score_rewards_category_words_place_and_date(make_report, make_item)
 
 
 @pytest.mark.django_db
+def test_S13_item_found_one_day_before_the_lost_date_still_gets_date_points(make_report, make_item):
+    item = make_item(category="Electronics", title="Black phone", general_area="Library", date_found=date(2026, 10, 10))
+    # Students often get the date off by one.
+    one_day_early = make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 11))
+    assert match_score(one_day_early, item) == 100
+    two_days_early = make_report(title="Lost my phone", place_lost="Library", date_lost=date(2026, 10, 12))
+    assert match_score(two_days_early, item) == 85
+
+
+@pytest.mark.django_db
 def test_S13_admin_sees_matching_reports_best_first(admin_client, make_report, make_item, other_student):
     item = make_item(title="Black phone", general_area="Library")
     make_report(title="Lost my phone", place_lost="Library")

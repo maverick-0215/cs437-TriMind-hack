@@ -68,8 +68,8 @@ export const REPORT_STATUS: Record<ReportStatus, { label: string; className: str
   CLOSED: { label: 'Closed', className: 'returned' },
 }
 
-/** S25: a found item that may match a report, and who to contact about it. */
-export type MatchItem = PublicItem & { contact: string; score: number }
+/** S25: a found item that may match a report. */
+export type MatchItem = PublicItem & { score: number }
 
 export type ReportDetail = Report & {
   matches: MatchItem[]
@@ -133,6 +133,6 @@ export type AdminList = {
 
 /** S6: the students' list of found items. */
 export type FoundList = {
-  items: (PublicItem & { contact: string })[]
+  items: PublicItem[]
   security_contact: string
 }

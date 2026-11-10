@@ -17,10 +17,10 @@ from .serializers import (
     AdminReportSerializer,
     ApproveSerializer,
     HandoverSerializer,
-    MatchItemSerializer,
     MyClaimSerializer,
     NotificationSerializer,
     PickupCodeSerializer,
+    PublicItemSerializer,
     ReportSerializer,
 )
 
@@ -34,11 +34,11 @@ def _error(exc, code=status.HTTP_409_CONFLICT):
 
 @api_view(["GET"])
 def items(request):
-    """S6: every found item at the security office, with where it was found and who to
-    contact. Public fields only (S7)."""
+    """S6: every found item at the security office, with where it was found. Public fields
+    only (S7); students contact the security office, never an admin's own email."""
     return Response(
         {
-            "items": MatchItemSerializer(services.available_items(), many=True).data,
+            "items": PublicItemSerializer(services.available_items(), many=True).data,
             "security_contact": settings.SECURITY_CONTACT,
         }
     )
@@ -83,11 +83,11 @@ def report_detail(request, pk):
     return Response(
         {
             **ReportSerializer(report).data,
-            # S25: found items that may be theirs, with who to contact.
+            # S25: found items that may be theirs. Who to meet is the security office below.
             # S27: a closed or approved report needs no more matches.
             "matches": []
             if report.linked_item_id
-            else [{**MatchItemSerializer(item).data, "score": score} for item, score in services.matching_items(report)],
+            else [{**PublicItemSerializer(item).data, "score": score} for item, score in services.matching_items(report)],
             "security_contact": settings.SECURITY_CONTACT,
         }
     )

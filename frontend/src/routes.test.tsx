@@ -157,7 +157,7 @@ it('S6: students see every found item with where it was found and who to contact
     if (url === '/api/items')
       return json({
         items: [
-          { id: 1, category: 'Bottle', title: 'Steel bottle', date_found: '2026-10-09', general_area: 'Mess', contact: 'guard@iitgn.ac.in' },
+          { id: 1, category: 'Bottle', title: 'Steel bottle', date_found: '2026-10-09', general_area: 'Mess' },
         ],
         security_contact: 'Security Office, Main Gate',
       })
@@ -166,7 +166,7 @@ it('S6: students see every found item with where it was found and who to contact
   renderAt('/found')
   expect(await screen.findByText('Steel bottle')).toBeTruthy()
   expect(screen.getByText('Mess')).toBeTruthy()
-  expect(screen.getByText('guard@iitgn.ac.in')).toBeTruthy()
+  expect(screen.getByText(/Security Office, Main Gate/)).toBeTruthy()
   expect(screen.getByRole('link', { name: 'Found items' })).toBeTruthy()
 })
 
