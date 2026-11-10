@@ -5,7 +5,7 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
+from django.core.mail import BadHeaderError, send_mail
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -32,10 +32,14 @@ def email_after_save(user, subject, body):
     so it must not hold the database open, and it must not go out for a change that was
     rolled back. A failed email is logged; the change itself stays."""
 
+    # Subjects include item titles, and Django refuses a subject with a line break in it
+    # (BadHeaderError), so keep the subject on one line.
+    subject = " ".join(subject.split())
+
     def send():
         try:
             send_mail(subject, body, None, [user.email])
-        except OSError:
+        except (OSError, BadHeaderError):
             logger.exception("Could not send %r to %s", subject, user.email)
 
     transaction.on_commit(send)
@@ -100,10 +104,13 @@ def _overlap(a, b):
 def match_score(report, item):
     """S13: how well a found item fits a lost report, 0 to 100. Uses only public item fields,
     so a student cannot learn private details by probing with reports."""
-    score = 40 if report.category == item.category else 0
-    # The item's category counts as a word too, so "Umbrella" matches a "Blue brolly" in Umbrella.
-    # Not on both sides, or every same-category pair would share a word for free.
-    score += 30 * _overlap(report.title, f"{item.title} {item.category}")
+    same_category = report.category == item.category
+    score = 40 if same_category else 0
+    # The item's category counts as a word too, so a report "Umbrella" filed under Other matches
+    # a "Blue brolly" in Umbrella. Only when the categories differ: otherwise the 40 above already
+    # counts it, and a vague report titled just "Electronics" would match every electronics item.
+    item_words = item.title if same_category else f"{item.title} {item.category}"
+    score += 30 * _overlap(report.title, item_words)
     score += 15 * _overlap(report.place_lost, item.general_area)
     days = (item.date_found - report.date_lost).days
     if -1 <= days <= 7:  # a day early still counts: students often get the date off by one
@@ -136,12 +143,18 @@ def matching_reports(item):
     return sorted([m for m in scored if m[1] >= MATCH_THRESHOLD], key=lambda m: (-m[1], -m[0].pk))
 
 
+def _short(title, limit=60):
+    """Two full 120-character titles would push a match message past Notification.message's
+    300 characters, which PostgreSQL refuses."""
+    return title if len(title) <= limit else title[: limit - 1].rstrip() + "…"
+
+
 def notify_matching_reports(item):
     """S26: tell each student whose report matches a newly added item."""
     for report, score in matching_reports(item):
         notify(
             report.student,
-            f'A found item "{item.title}" matches your lost report "{report.title}" ({score}%). '
+            f'A found item "{_short(item.title)}" matches your lost report "{_short(report.title)}" ({score}%). '
             "Open the report to see where to collect it.",
             f"/reports/{report.pk}",
         )

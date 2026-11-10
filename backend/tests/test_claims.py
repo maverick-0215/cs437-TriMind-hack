@@ -340,3 +340,30 @@ def test_S19_cancel_and_approve_again_gives_fresh_tries(approved_item, admin_cli
     assert admin_client.post(f"/api/admin/claims/{claim.pk}/cancel").status_code == 204
     _approve(admin_client, approved_item, email=student.email)
     assert _hand_over(admin_client, approved_item, CODE).status_code == 201
+
+
+@pytest.mark.django_db
+def test_S17_line_break_in_title_does_not_break_approval_or_its_emails(
+    make_item, make_report, admin_client, student, django_capture_on_commit_callbacks
+):
+    item = make_item(title="Phone\nBcc: x@evil.com")
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        assert _approve(admin_client, item, report_id=make_report().pk).status_code == 204
+        assert _hand_over(admin_client, item, CODE).status_code == 201
+    assert [m.to for m in mail.outbox] == [[student.email], [student.email]]
+    assert all("\n" not in m.subject and m.bcc == [] for m in mail.outbox)
+    assert CODE in mail.outbox[0].body
+
+
+@pytest.mark.django_db
+def test_S18_line_break_in_title_does_not_break_cancel_email(
+    make_item, make_report, admin_client, student, django_capture_on_commit_callbacks
+):
+    item = make_item(title="Phone\nBcc: x@evil.com")
+    _approve(admin_client, item, report_id=make_report().pk)
+    mail.outbox.clear()
+    with django_capture_on_commit_callbacks(execute=True):
+        response = admin_client.post(f"/api/admin/claims/{item.claims.get().pk}/cancel")
+    assert response.status_code == 204
+    assert [m.to for m in mail.outbox] == [[student.email]]

@@ -41,7 +41,7 @@ Each statement has at least one automated test that names its ID.
 
 ### Matching
 
-- **S13.** A lost report and a found item get a match score from 0 to 100% using only the item's public fields: same category (40), shared words in the title and category (up to 30), shared words in the place lost and general area (up to 15), and how soon after the lost date the item was found (up to 15). Items found one day before the lost date still get full date points, since students often get the date off by one; items found earlier get nothing for date. A score of 60% or more is a match.
+- **S13.** A lost report and a found item get a match score from 0 to 100% using only the item's public fields: same category (40), shared words in the title and category (up to 30; the item's category counts as a word only when the report's category is different, so a report titled just "Electronics" does not match every electronics item), shared words in the place lost and general area (up to 15), and how soon after the lost date the item was found (up to 15). Items found one day before the lost date still get full date points, since students often get the date off by one; items found earlier get nothing for date. A score of 60% or more is a match.
 - **S26.** When an admin adds a found item, every student with a lost report that matches it gets an in-app notification. No one else does.
 
 ### Approval and handover

@@ -63,3 +63,22 @@ def test_S26_adding_item_notifies_students_with_matching_reports(admin_client, m
     notes = list(Notification.objects.all())
     assert [(n.user, n.link) for n in notes] == [(match.student, f"/reports/{match.pk}")]
     assert "Lost my phone" in notes[0].message
+
+
+@pytest.mark.django_db
+def test_S13_vague_report_naming_only_the_category_is_not_a_match(make_report, make_item):
+    # Same category already earns 40; the category name in the title must not earn 30 more.
+    vague = make_report(category="Electronics", title="Electronics", place_lost="Somewhere", date_lost=date(2026, 10, 9))
+    for title in ("Black Samsung phone", "Silver laptop"):
+        assert match_score(vague, make_item(category="Electronics", title=title)) < MATCH_THRESHOLD
+
+
+@pytest.mark.django_db
+def test_S26_long_titles_still_notify(admin_client, make_report):
+    title = "Black phone " + "x" * 108  # 120 characters, the longest allowed
+    make_report(title=title, place_lost="Library", date_lost=date(2026, 10, 9))
+    response = admin_client.post("/api/admin/items", {**NEW_ITEM, "title": title}, format="multipart")
+    assert response.status_code == 201
+    note = Notification.objects.get()
+    # SQLite ignores max_length, PostgreSQL refuses longer messages.
+    assert len(note.message) <= Notification._meta.get_field("message").max_length
