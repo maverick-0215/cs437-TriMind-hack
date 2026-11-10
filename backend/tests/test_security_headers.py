@@ -25,7 +25,7 @@ def test_home_page_sends_a_content_security_policy(anon, built_frontend):
     assert policy["frame-ancestors"] == ["'none'"]
     # Only our own scripts and Google's sign-in script; nothing inline, nothing eval'd.
     assert set(policy["script-src"]) == {"'self'", "https://accounts.google.com/gsi/client"}
-    assert "'unsafe-inline'" not in str(policy) and "'unsafe-eval'" not in str(policy)
+    assert "'unsafe-inline'" not in policy["script-src"] and "'unsafe-eval'" not in str(policy)
 
 
 @pytest.mark.django_db

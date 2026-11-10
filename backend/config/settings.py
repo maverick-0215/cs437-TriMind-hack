@@ -116,7 +116,9 @@ GSI = "https://accounts.google.com/gsi/"
 CONTENT_SECURITY_POLICY = {
     "default-src": ["'self'"],
     "script-src": ["'self'", GSI + "client"],
-    "style-src": ["'self'", GSI + "style"],
+    # 'unsafe-inline' for styles only: Google's sign-in button sizes itself with inline styles,
+    # and without them its logo renders huge. Inline styles cannot run code; scripts stay locked.
+    "style-src": ["'self'", "'unsafe-inline'", GSI + "style"],
     "frame-src": [GSI],
     "connect-src": ["'self'", GSI],
     "img-src": ["'self'"],
