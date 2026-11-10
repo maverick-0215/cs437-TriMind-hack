@@ -11,6 +11,16 @@ def not_in_future(value):
     return value
 
 
+MAX_PHOTO_MB = 5
+
+
+def photo_not_too_big(photo):
+    """S4, S33: photos are at most 5 MB, so uploads cannot fill the disk."""
+    if photo.size > MAX_PHOTO_MB * 1024 * 1024:
+        raise serializers.ValidationError(f"The photo must be {MAX_PHOTO_MB} MB or smaller.")
+    return photo
+
+
 class PublicItemSerializer(serializers.ModelSerializer):
     """The only item fields non-admins ever receive (S6, S7)."""
 
@@ -29,7 +39,7 @@ class MatchItemSerializer(PublicItemSerializer):
 
 
 class AdminItemSerializer(serializers.ModelSerializer):
-    photo = serializers.ImageField(write_only=True, required=False)
+    photo = serializers.ImageField(write_only=True, required=False, validators=[photo_not_too_big])
     has_photo = serializers.SerializerMethodField()
     added_by = serializers.EmailField(source="added_by.email", read_only=True)
 
@@ -52,12 +62,15 @@ class ReportSerializer(serializers.ModelSerializer):
     status = serializers.SerializerMethodField()
     closed_at = serializers.SerializerMethodField()
     item = PublicItemSerializer(source="linked_item", read_only=True)
+    # S33: an optional photo, served only by /api/reports/<id>/photo.
+    photo = serializers.ImageField(write_only=True, required=False, validators=[photo_not_too_big])
+    has_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = LostReport
         fields = [
-            "id", "category", "title", "date_lost", "place_lost", "private_details", "created_at",
-            "status", "closed_at", "item",
+            "id", "category", "title", "date_lost", "place_lost", "private_details", "photo", "has_photo",
+            "created_at", "status", "closed_at", "item",
         ]
         extra_kwargs = {"date_lost": {"validators": [not_in_future]}}
 
@@ -66,6 +79,9 @@ class ReportSerializer(serializers.ModelSerializer):
             return "OPEN"
         return "CLOSED" if report.linked_item.status == FoundItem.Status.RETURNED else "APPROVED"
 
+    def get_has_photo(self, report):
+        return bool(report.photo)
+
     def get_closed_at(self, report):
         handover = getattr(report.linked_item, "handover", None) if report.linked_item else None
         return handover.handed_over_at if handover else None
@@ -73,10 +89,14 @@ class ReportSerializer(serializers.ModelSerializer):
 
 class AdminReportSerializer(serializers.ModelSerializer):
     student = serializers.EmailField(source="student.email")
+    has_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = LostReport
-        fields = ["id", "category", "title", "date_lost", "place_lost", "private_details", "student"]
+        fields = ["id", "category", "title", "date_lost", "place_lost", "private_details", "has_photo", "student"]
+
+    def get_has_photo(self, report):
+        return bool(report.photo)
 
 
 class MyClaimSerializer(serializers.ModelSerializer):

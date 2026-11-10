@@ -25,7 +25,7 @@ Each statement has at least one automated test that names its ID.
 
 ### Found items
 
-- **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo.
+- **S4.** An admin can add a found item with a category, title, date found, general area, and private details: exact location, description and an optional photo. A photo must be an image of at most 5 MB; anything else is rejected.
 - **S5.** A new found item has status `AVAILABLE`.
 - **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact.
 - **S7.** Students never see a found item's private details (exact location, description, photo) anywhere in the app or its API.
@@ -37,6 +37,7 @@ Each statement has at least one automated test that names its ID.
 - **S11.** A student can file a lost report with a category, title, date lost, place lost and private identifying details.
 - **S12.** A student can see only their own lost reports. Opening another student's report returns 403 or 404.
 - **S25.** A student's lost report shows every `AVAILABLE` found item that matches it by at least 60% (S13), best match first, with the match percentage, where it was found (general area) and who to meet. It never shows private details. If there are none, the page says no such item is here yet and that they will be notified.
+- **S33.** A student can add an optional photo to a lost report, with the same limits as a found item's photo (S4). Like the identifying details, only that student and admins can see it; admins see it next to the report when it matches a found item.
 
 ### Matching
 

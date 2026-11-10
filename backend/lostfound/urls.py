@@ -12,6 +12,7 @@ urlpatterns = [
     # Everything below needs login.
     path("reports", views.reports),
     path("reports/<int:pk>", views.report_detail),
+    path("reports/<int:pk>/photo", views.report_photo),
     path("claims", views.my_claims),
     path("items", views.items),
     path("notifications", views.notifications),

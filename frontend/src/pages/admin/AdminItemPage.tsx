@@ -115,6 +115,8 @@ export default function AdminItemPage() {
                 {r.title} · {r.category} · lost {formatDate(r.date_lost)} at {r.place_lost}
               </p>
               <p className="pre">{r.private_details}</p>
+              {/* S33: the student's own photo of what they lost, to compare with the item. */}
+              {r.has_photo && <img className="photo" src={`/api/reports/${r.id}/photo`} alt={`${r.student}'s photo of ${r.title}`} />}
               <button disabled={busy} onClick={() => approve({ report_id: r.id }, r.student)}>
                 Approve {r.student}
               </button>

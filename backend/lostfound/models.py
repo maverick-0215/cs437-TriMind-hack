@@ -49,6 +49,8 @@ class LostReport(models.Model):
     date_lost = models.DateField()
     place_lost = models.CharField(max_length=200)
     private_details = models.TextField()
+    # S33: optional, private like private_details: only the student and admins see it.
+    photo = models.ImageField(upload_to="report_photos/", blank=True)
     linked_item = models.ForeignKey(
         FoundItem, null=True, blank=True, on_delete=models.SET_NULL, related_name="linked_reports"
     )
