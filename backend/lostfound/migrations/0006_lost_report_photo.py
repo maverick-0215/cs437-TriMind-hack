@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('lostfound', '0004_remove_password_sign_in'),
+        ('lostfound', '0005_claim_wrong_code_tries'),
     ]
 
     operations = [
