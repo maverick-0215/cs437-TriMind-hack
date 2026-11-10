@@ -7,6 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import F
 from django.utils import timezone
 
 from .models import Claim, FoundItem, Handover, LostReport, Notification
@@ -222,16 +223,30 @@ def cancel_approval(claim, admin):
     )
 
 
-@transaction.atomic
+MAX_CODE_TRIES = 5
+
+
 def hand_over(item, code, admin):
-    item = FoundItem.objects.select_for_update().get(pk=item.pk)
-    claim = item.claims.filter(status=Claim.Status.APPROVED, code_used_at__isnull=True).first()
-    if (
-        item.status != FoundItem.Status.CLAIMED
-        or claim is None
-        or not secrets.compare_digest(claim.pickup_code, code)
-    ):
-        raise ClaimError("Wrong or already used pickup code.")
+    """S19, S20: the right pickup code, once, marks the item returned. After MAX_CODE_TRIES
+    wrong codes for one approval every code is refused, so the code cannot be guessed; the
+    admin cancels and approves again (S18), which sends the student a new code."""
+    with transaction.atomic():
+        item = FoundItem.objects.select_for_update().get(pk=item.pk)
+        claim = item.claims.filter(status=Claim.Status.APPROVED, code_used_at__isnull=True).first()
+        if item.status != FoundItem.Status.CLAIMED or claim is None:
+            raise ClaimError("Wrong or already used pickup code.")
+        if claim.wrong_code_tries >= MAX_CODE_TRIES:
+            raise ClaimError(
+                "Too many wrong codes. Cancel this approval and approve the student again to send a new code."
+            )
+        if secrets.compare_digest(claim.pickup_code, code):
+            return _complete_handover(item, claim, admin)
+        # Saved before raising, outside the rollback, so every wrong try counts.
+        Claim.objects.filter(pk=claim.pk).update(wrong_code_tries=F("wrong_code_tries") + 1)
+    raise ClaimError("Wrong or already used pickup code.")
+
+
+def _complete_handover(item, claim, admin):
     claim.code_used_at = timezone.now()
     claim.save(update_fields=["code_used_at"])
     item.status = FoundItem.Status.RETURNED
