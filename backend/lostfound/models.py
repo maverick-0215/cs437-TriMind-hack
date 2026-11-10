@@ -78,6 +78,8 @@ class Claim(models.Model):
     # S17: shown only to the claiming student. S20: works once.
     pickup_code = models.CharField(max_length=6, blank=True)
     code_used_at = models.DateTimeField(null=True, blank=True)
+    # S19: wrong codes tried for this approval; after MAX_CODE_TRIES every code is refused.
+    wrong_code_tries = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         ordering = ["-created_at"]
