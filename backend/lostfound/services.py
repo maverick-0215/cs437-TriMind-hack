@@ -72,7 +72,7 @@ def recent_duplicate_report(student, data):
     return LostReport.objects.filter(
         student=student,
         created_at__gte=timezone.now() - DUPLICATE_WINDOW,
-        **{field: data[field] for field in REPORT_FIELDS},
+        **{field: data.get(field, "") for field in REPORT_FIELDS},
     ).first()
 
 
@@ -178,6 +178,28 @@ def notify_matching_reports(item):
             "Open the report to see where to collect it.",
             f"/reports/{report.pk}",
         )
+
+
+# --- Old records (S35) ---
+
+KEEP_CLOSED_DAYS = 60
+
+
+def delete_old_closed_reports():
+    """S35: 60 days after an item was collected, delete the closed lost reports tied to it and
+    both photos, so old private data does not pile up. The handover log (S21) and the item's
+    short record stay as the summary. Open and approved reports are never touched."""
+    cutoff = timezone.now() - timedelta(days=KEEP_CLOSED_DAYS)
+    items = FoundItem.objects.filter(status=FoundItem.Status.RETURNED, handover__handed_over_at__lt=cutoff)
+    reports = LostReport.objects.filter(linked_item__in=items)
+    deleted = 0
+    for report in reports:
+        report.photo.delete(save=False)
+        report.delete()
+        deleted += 1
+    for item in items.exclude(photo=""):
+        item.photo.delete(save=True)
+    return deleted
 
 
 # --- Approval and handover (S16-S21) ---

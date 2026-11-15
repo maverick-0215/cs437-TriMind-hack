@@ -114,7 +114,7 @@ def test_S3_student_gets_403_on_every_admin_route(student_client, url):
 
 
 def test_S3_admin_route_check_covers_all_admin_routes():
-    assert len(_api_urls("admin/")) == 10
+    assert len(_api_urls("admin/")) == 11
 
 
 OPEN_TO_VISITORS = {"/api/auth/config", "/api/auth/google", "/api/auth/dev-login", "/api/auth/logout"}

@@ -76,6 +76,9 @@ export type ReportDetail = Report & {
   security_contact: string
 }
 
+/** S34: a lost report on the admin's Lost reports tab. */
+export type AdminLostReport = Report & { student: string; matches: MatchItem[] }
+
 export type AdminReport = Omit<Report, 'created_at' | 'status' | 'closed_at' | 'item'> & {
   student: string
 }

@@ -34,10 +34,11 @@ Each statement has at least one automated test that names its ID.
 
 ### Lost reports
 
-- **S11.** A student can file a lost report with a category, title, date lost, place lost and private identifying details.
+- **S11.** A student can file a lost report with a category, title, date lost and private identifying details, and optionally the place lost (they may not remember it). A report without a place still matches on the other fields (S13).
 - **S12.** A student can see only their own lost reports. Opening another student's report returns 403 or 404.
 - **S25.** A student's lost report shows every `AVAILABLE` found item that matches it by at least 60% (S13), best match first, with the match percentage, where it was found (general area) and who to meet. It never shows private details. If there are none, the page says no such item is here yet and that they will be notified.
 - **S33.** A student can add an optional photo to a lost report, with the same limits as a found item's photo (S4), on at most 10 lost reports a day; after that a report can still be filed without a photo. Like the identifying details, only that student and admins can see it; admins see it next to the report when it matches a found item.
+- **S34.** An admin has a Lost reports tab listing every student's lost report, newest first, with the student's email, its details (place shown as not given if blank), identifying details, photo, status (open, approved or closed) and, for open reports, the `AVAILABLE` found items that match it (S13), each linking to that item. Students get 403 on it (S3).
 
 ### Matching
 
@@ -60,3 +61,4 @@ Students do not claim items in the app. They see a match, go to the security off
 
 - **S21.** Every handover is logged with the item, student, admin, date and time.
 - **S22.** Returned items are no longer shown as matches.
+- **S35.** 60 days after an item is collected, the closed lost reports tied to it are deleted with their photos, and the item's photo is deleted too. The handover log (S21) and the item's short record stay as the summary. Open and approved reports are never deleted. The cleanup runs on every start of the app and whenever an admin opens the Lost reports tab.

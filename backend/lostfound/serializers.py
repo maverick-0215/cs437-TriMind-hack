@@ -90,6 +90,15 @@ class AdminReportSerializer(serializers.ModelSerializer):
         return bool(report.photo)
 
 
+class AdminReportListSerializer(ReportSerializer):
+    """S34: every lost report for the admin's Lost reports tab, with who filed it."""
+
+    student = serializers.EmailField(source="student.email", read_only=True)
+
+    class Meta(ReportSerializer.Meta):
+        fields = [f for f in ReportSerializer.Meta.fields if f != "photo"] + ["student"]
+
+
 class MyClaimSerializer(serializers.ModelSerializer):
     item = PublicItemSerializer()
     pickup_code = serializers.SerializerMethodField()

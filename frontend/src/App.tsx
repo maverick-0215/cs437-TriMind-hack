@@ -6,6 +6,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminHandoversPage from './pages/admin/AdminHandoversPage'
 import AdminItemNewPage from './pages/admin/AdminItemNewPage'
 import AdminItemPage from './pages/admin/AdminItemPage'
+import AdminReportsPage from './pages/admin/AdminReportsPage'
 import ClaimsPage from './pages/ClaimsPage'
 import FoundItemsPage from './pages/FoundItemsPage'
 import GuidePage from './pages/GuidePage'
@@ -41,6 +42,7 @@ export function AppRoutes() {
               <Route index element={<AdminDashboardPage />} />
               <Route path="items/new" element={<AdminItemNewPage />} />
               <Route path="items/:id" element={<AdminItemPage />} />
+              <Route path="reports" element={<AdminReportsPage />} />
               <Route path="handovers" element={<AdminHandoversPage />} />
               <Route path="admins" element={<AdminAdminsPage />} />
             </Route>

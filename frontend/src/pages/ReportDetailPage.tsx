@@ -22,7 +22,7 @@ export default function ReportDetailPage() {
         <dt>Date lost</dt>
         <dd>{formatDate(report.date_lost)}</dd>
         <dt>Place lost</dt>
-        <dd>{report.place_lost}</dd>
+        <dd>{report.place_lost || 'Not given'}</dd>
         <dt>Identifying details</dt>
         <dd className="pre">{report.private_details}</dd>
       </dl>

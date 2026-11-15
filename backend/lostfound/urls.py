@@ -26,6 +26,7 @@ urlpatterns = [
     path("admin/pickups", views.admin_pickups),
     path("admin/claims/<int:pk>/cancel", views.admin_claim_cancel),
     path("admin/handovers", views.admin_handovers),
+    path("admin/reports", views.admin_reports),
     path("admin/admins", views.admin_admins),
     path("admin/admins/<int:pk>/remove", views.admin_admin_remove),
 ]

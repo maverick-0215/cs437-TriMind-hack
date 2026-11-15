@@ -121,7 +121,7 @@ export default function AdminItemPage() {
                 <strong>{r.student}</strong> <span className="status available">{r.score}% match</span>
               </p>
               <p className="muted">
-                {r.title} · {r.category} · lost {formatDate(r.date_lost)} at {r.place_lost}
+                {r.title} · {r.category} · lost {formatDate(r.date_lost)} {r.place_lost ? `at ${r.place_lost}` : '(place not given)'}
               </p>
               <p className="pre">{r.private_details}</p>
               {/* S33: the student's own photo of what they lost, to compare with the item. */}
