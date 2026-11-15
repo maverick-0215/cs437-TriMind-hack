@@ -47,7 +47,7 @@ class LostReport(models.Model):
     category = models.CharField(max_length=32, choices=Category.choices)
     title = models.CharField(max_length=120)
     date_lost = models.DateField()
-    place_lost = models.CharField(max_length=200)
+    place_lost = models.CharField(max_length=200, blank=True)  # S11: optional, students may not remember
     private_details = models.TextField()
     # S33: optional, private like private_details: only the student and admins see it.
     photo = models.ImageField(upload_to="report_photos/", blank=True)

@@ -271,3 +271,38 @@ it('S24: Google sign-in sends the chosen role, shows "Signing you in", then expl
   expect(await screen.findByText('This account is not a security office admin.')).toBeTruthy()
   expect(screen.queryByText(/Signing you in/)).toBeNull()
 })
+
+describe('S34: the Lost reports tab', () => {
+  const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
+  const REPORTS = [
+    {
+      id: 3, category: 'Wallet', title: 'Brown wallet', date_lost: '2026-10-01', place_lost: '',
+      private_details: 'Metro card inside', has_photo: false, created_at: '2026-10-02T10:00:00Z',
+      status: 'OPEN', closed_at: null, item: null, student: 'ravi@iitgn.ac.in',
+      matches: [{ id: 9, category: 'Wallet', title: 'Brown leather wallet', date_found: '2026-10-03', general_area: 'Mess', score: 78 }],
+    },
+  ]
+
+  it('S34: shows every report with its student, details and matching items', async () => {
+    vi.stubGlobal('fetch', async (url: string) => {
+      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+      if (url === '/api/auth/me') return json(ADMIN)
+      if (url === '/api/admin/reports') return json(REPORTS)
+      return json([])
+    })
+    renderAt('/admin/reports')
+    expect(await screen.findByText('Brown wallet')).toBeTruthy()
+    expect(screen.getByText(/ravi@iitgn\.ac\.in/)).toBeTruthy()
+    expect(screen.getByText(/place not given/)).toBeTruthy()
+    expect(screen.getByText('Metro card inside')).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Brown leather wallet' }).getAttribute('href')).toBe('/admin/items/9')
+    expect(screen.getByRole('link', { name: 'Lost reports' })).toBeTruthy()
+  })
+
+  it('S34: students get 403 and never call the admin API', async () => {
+    const calls = fakeApi(STUDENT)
+    renderAt('/admin/reports')
+    expect(await screen.findByText('403 · Not allowed')).toBeTruthy()
+    expect(calls.filter((url) => url.startsWith('/api/admin/'))).toEqual([])
+  })
+})

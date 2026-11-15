@@ -33,6 +33,7 @@ export default function Layout() {
                   Security desk
                 </NavLink>
                 <NavLink to="/admin/items/new">Add found item</NavLink>
+                <NavLink to="/admin/reports">Lost reports</NavLink>
                 <NavLink to="/admin/handovers">Handovers</NavLink>
                 <NavLink to="/admin/admins">Admins</NavLink>
               </>

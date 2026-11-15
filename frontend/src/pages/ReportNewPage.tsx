@@ -54,8 +54,9 @@ export default function ReportNewPage() {
           <input name="date_lost" type="date" required max={todayISO()} />
         </label>
         <label>
-          Place lost
-          <input name="place_lost" required maxLength={200} placeholder="Library reading hall" />
+          Place lost (optional)
+          <small className="muted">Leave it blank if you do not remember.</small>
+          <input name="place_lost" maxLength={200} placeholder="Library reading hall" />
         </label>
         <label>
           Identifying details

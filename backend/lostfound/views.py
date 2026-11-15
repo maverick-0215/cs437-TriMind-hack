@@ -14,6 +14,7 @@ from .serializers import (
     AdminClaimSerializer,
     AdminEmailSerializer,
     AdminItemSerializer,
+    AdminReportListSerializer,
     AdminReportSerializer,
     ApproveSerializer,
     HandoverSerializer,
@@ -215,6 +216,29 @@ def admin_claim_cancel(request, pk):
     except services.ClaimError as e:
         return _error(e)
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+@permission_classes([IsAdmin])
+def admin_reports(request):
+    """S34: every student's lost report, newest first, with the found items that match the
+    open ones. S35: opening it also deletes reports closed more than 60 days ago."""
+    services.delete_old_closed_reports()
+    reports = LostReport.objects.select_related("student", "linked_item__handover")
+    return Response(
+        [
+            {
+                **AdminReportListSerializer(report).data,
+                "matches": []
+                if report.linked_item_id
+                else [
+                    {**PublicItemSerializer(item).data, "score": score}
+                    for item, score in services.matching_items(report)
+                ],
+            }
+            for report in reports
+        ]
+    )
 
 
 @api_view(["GET"])

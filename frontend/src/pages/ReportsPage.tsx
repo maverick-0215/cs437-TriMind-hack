@@ -24,7 +24,7 @@ export default function ReportsPage() {
                 <strong>{r.title}</strong>
               </Link>
               <p className="muted">
-                {r.category} · lost {formatDate(r.date_lost)} · {r.place_lost}
+                {r.category} · lost {formatDate(r.date_lost)} · {r.place_lost || 'place not given'}
               </p>
             </div>
             <span className={`status ${REPORT_STATUS[r.status].className}`}>{REPORT_STATUS[r.status].label}</span>
