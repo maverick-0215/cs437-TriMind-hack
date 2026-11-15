@@ -282,3 +282,19 @@ def test_S35_opening_the_lost_reports_tab_also_cleans_up(admin_client, make_item
     _, old_report = _closed(make_item, make_report, admin_user, days_ago=90)
     assert old_report.pk not in [r["id"] for r in admin_client.get("/api/admin/reports").json()]
     assert not LostReport.objects.filter(pk=old_report.pk).exists()
+
+
+@pytest.mark.django_db
+def test_S33_student_can_add_photos_to_at_most_10_reports_a_day(student_client, other_client):
+    def file(client, n, **extra):
+        return client.post("/api/reports", {**S33_REPORT, "title": f"Blue backpack {n}", **extra}, format="multipart")
+
+    for n in range(10):
+        assert file(student_client, n, photo=_report_png()).status_code == 201
+    refused = file(student_client, 10, photo=_report_png())
+    assert refused.status_code == 400
+    assert "photo" in str(refused.json()).lower()
+    assert LostReport.objects.count() == 10
+    # The report itself can still be filed, without a photo, and other students are unaffected.
+    assert file(student_client, 11).status_code == 201
+    assert file(other_client, 0, photo=_report_png()).status_code == 201

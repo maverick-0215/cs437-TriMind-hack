@@ -197,6 +197,41 @@ it('S17: after approving someone, the guard is told their pickup code was emaile
   expect(await screen.findByText(/We emailed walk.in@iitgn.ac.in their pickup code/)).toBeTruthy()
 })
 
+it('S17: if the pickup code email failed, the guard is told so and not that it was sent', async () => {
+  const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
+  const detail = {
+    item: {
+      id: 1, category: 'Bag', title: 'Blue bag', date_found: '2026-10-06', general_area: 'Mess',
+      exact_location: 'Counter', description: 'Zip pocket', has_photo: false, status: 'AVAILABLE',
+      added_by: 'guard@iitgn.ac.in', created_at: '2026-10-06T10:00:00Z',
+    },
+    claims: [], awaiting_pickup_by: null, handover: null, candidates: [],
+  }
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json(ADMIN)
+    if (url === '/api/admin/items/1/approve')
+      return json({ email_sent: false, detail: 'Approved, but we could not email walk.in@iitgn.ac.in.' })
+    if (url === '/api/admin/items/1') return json(detail)
+    return json([])
+  })
+  renderAt('/admin/items/1')
+  fireEvent.change(await screen.findByLabelText('Email to approve'), { target: { value: 'walk.in@iitgn.ac.in' } })
+  fireEvent.click(screen.getByText('Approve'))
+  expect(await screen.findByText(/could not email walk.in@iitgn.ac.in/)).toBeTruthy()
+  expect(screen.queryByText(/We emailed/)).toBeNull()
+})
+
+it('the guide no longer tells anyone to meet a listed person', async () => {
+  for (const user of [STUDENT, { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }]) {
+    fakeApi(user)
+    renderAt('/guide')
+    const page = (await screen.findByRole('heading', { name: 'How IITGN Lost & Found works' })).closest('main') ?? document.body
+    expect(page.textContent).not.toMatch(/person listed|who to meet/i)
+    cleanup()
+  }
+})
+
 it('S16: a refused approval is explained right under the Approve box', async () => {
   const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
   const detail = {

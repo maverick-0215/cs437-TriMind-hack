@@ -30,19 +30,26 @@ def notify(user, message, link=""):
 def email_after_save(user, subject, body):
     """Email someone once the current transaction is saved. Sending waits for the mail server,
     so it must not hold the database open, and it must not go out for a change that was
-    rolled back. A failed email is logged; the change itself stays."""
+    rolled back. A failed email is logged; the change itself stays.
+
+    Returns {"sent": None}, filled in with True or False once sending was tried, so the view
+    can tell the admin when it failed."""
 
     # Subjects include item titles, and Django refuses a subject with a line break in it
     # (BadHeaderError), so keep the subject on one line.
     subject = " ".join(subject.split())
+    outcome = {"sent": None}
 
     def send():
         try:
             send_mail(subject, body, None, [user.email])
+            outcome["sent"] = True
         except (OSError, BadHeaderError):
+            outcome["sent"] = False
             logger.exception("Could not send %r to %s", subject, user.email)
 
     transaction.on_commit(send)
+    return outcome
 
 
 # --- Duplicate submissions (S32) ---
@@ -67,6 +74,19 @@ def recent_duplicate_report(student, data):
         created_at__gte=timezone.now() - DUPLICATE_WINDOW,
         **{field: data.get(field, "") for field in REPORT_FIELDS},
     ).first()
+
+
+REPORT_PHOTOS_PER_DAY = 10
+
+
+def photo_limit_reached(student):
+    """S33: each photo can be 5 MB, so the number per day is capped too (about 50 MB a day at most)."""
+    return (
+        LostReport.objects.filter(student=student, created_at__gte=timezone.now() - timedelta(days=1))
+        .exclude(photo="")
+        .count()
+        >= REPORT_PHOTOS_PER_DAY
+    )
 
 
 def recent_duplicate_item(admin, data):
@@ -220,7 +240,7 @@ def approve_owner(item, student, admin, report=None):
     )
     # S17: the code also goes to the student's own inbox, so someone approved by email who has
     # not signed in yet still gets it. Never to admins, never in a notification.
-    email_after_save(
+    claim.email = email_after_save(
         student,
         f'Your pickup code for "{item.title}"',
         f'You have been approved to collect "{item.title}" from the IITGN security office.\n\n'
@@ -247,7 +267,7 @@ def cancel_approval(claim, admin):
     # S27: the report is open again.
     LostReport.objects.filter(linked_item=claim.item, student=claim.student).update(linked_item=None)
     notify(claim.student, f'Your approval to collect "{claim.item.title}" was cancelled.', "/claims")
-    email_after_save(
+    return email_after_save(
         claim.student,
         f'Approval cancelled for "{claim.item.title}"',
         f'The security office cancelled your approval to collect "{claim.item.title}". '

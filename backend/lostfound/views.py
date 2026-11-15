@@ -70,6 +70,15 @@ def reports(request):
             # S32: sent twice by mistake? Return the report already saved instead of a copy.
             if existing := services.recent_duplicate_report(request.user, serializer.validated_data):
                 return Response(ReportSerializer(existing).data, status=status.HTTP_200_OK)
+            # S33: a cap on photos per day, so one account cannot fill the server's disk.
+            if serializer.validated_data.get("photo") and services.photo_limit_reached(request.user):
+                return Response(
+                    {"photo": [
+                        f"You can add photos to at most {services.REPORT_PHOTOS_PER_DAY} lost reports a day. "
+                        "File this report without a photo, or try again tomorrow."
+                    ]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             serializer.save(student=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     # S12: only the student's own reports.
@@ -179,10 +188,21 @@ def admin_item_approve(request, pk):
     if is_admin(student):
         return _error("Security office accounts cannot collect items.", status.HTTP_400_BAD_REQUEST)
     try:
-        services.approve_owner(item, student, request.user, serializer.validated_data.get("report"))
+        claim = services.approve_owner(item, student, request.user, serializer.validated_data.get("report"))
     except services.ClaimError as e:
         return _error(e)
+    if claim.email["sent"] is False:
+        # S17: the code itself is never shown to the admin.
+        return _email_failed(
+            f"Approved, but we could not email {student.email} their pickup code. They can see it under "
+            "Pickup codes once they sign in with that email."
+        )
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+def _email_failed(detail):
+    """The change was saved, but the email about it did not go out."""
+    return Response({"email_sent": False, "detail": detail}, status=status.HTTP_200_OK)
 
 
 @api_view(["POST"])
@@ -211,10 +231,13 @@ def admin_pickups(request):
 @api_view(["POST"])
 @permission_classes([IsAdmin])
 def admin_claim_cancel(request, pk):
+    claim = get_object_or_404(Claim, pk=pk)
     try:
-        services.cancel_approval(get_object_or_404(Claim, pk=pk), request.user)
+        email = services.cancel_approval(claim, request.user)
     except services.ClaimError as e:
         return _error(e)
+    if email["sent"] is False:
+        return _email_failed(f"Approval cancelled, but we could not email {claim.student.email} about it.")
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

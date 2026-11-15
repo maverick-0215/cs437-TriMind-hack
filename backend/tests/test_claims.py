@@ -367,3 +367,40 @@ def test_S18_line_break_in_title_does_not_break_cancel_email(
         response = admin_client.post(f"/api/admin/claims/{item.claims.get().pk}/cancel")
     assert response.status_code == 204
     assert [m.to for m in mail.outbox] == [[student.email]]
+
+
+def _mail_server_down(monkeypatch):
+    from smtplib import SMTPException
+
+    def fail(*args, **kwargs):
+        raise SMTPException("mail server down")
+
+    monkeypatch.setattr("lostfound.services.send_mail", fail)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_S17_admin_is_told_when_the_pickup_code_email_failed(make_item, admin_client, monkeypatch):
+    item = make_item()
+    _mail_server_down(monkeypatch)
+    response = _approve(admin_client, item, email="walk.in@iitgn.ac.in")
+    assert response.status_code == 200
+    assert response.json()["email_sent"] is False
+    assert "could not" in response.json()["detail"].lower()
+    assert CODE not in str(response.json())  # S17: never shown to the admin
+    item.refresh_from_db()
+    assert item.status == FoundItem.Status.CLAIMED  # the approval itself stands
+
+
+@pytest.mark.django_db(transaction=True)
+def test_S18_admin_is_told_when_the_cancel_email_failed(make_item, admin_client, monkeypatch):
+    item = make_item()
+    _approve(admin_client, item, email="walk.in@iitgn.ac.in")
+    _mail_server_down(monkeypatch)
+    response = admin_client.post(f"/api/admin/claims/{item.claims.get().pk}/cancel")
+    assert response.status_code == 200
+    assert response.json()["email_sent"] is False
+
+
+@pytest.mark.django_db(transaction=True)
+def test_S17_approve_is_204_when_the_email_went_out(make_item, admin_client):
+    assert _approve(admin_client, make_item(), email="walk.in@iitgn.ac.in").status_code == 204

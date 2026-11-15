@@ -21,8 +21,7 @@ const STUDENT_STEPS: Step[] = [
     title: 'Check for matches',
     body: (
       <>
-        Open your report. Found items that match it by 60% or more are listed there, with where each was found and who
-        to meet. If nothing matches yet, that's fine: we'll send you a notification as soon as a matching item is
+        Open your report. Found items that match it by 60% or more are listed there, with where each was found. If nothing matches yet, that's fine: we'll send you a notification as soon as a matching item is
         added.
       </>
     ),
@@ -31,7 +30,7 @@ const STUDENT_STEPS: Step[] = [
     title: 'Go to the security office',
     body: (
       <>
-        If one of the matches looks like yours, go to the security office and meet the person listed. They'll check
+        If one of the matches looks like yours, go to the security office. The guard there will check
         your identifying details against the item. If it's yours, they approve you in the app.
       </>
     ),
@@ -62,8 +61,8 @@ const ADMIN_STEPS: Step[] = [
     title: 'Students are told automatically',
     body: (
       <>
-        Anyone whose lost report matches the item by 60% or more gets a notification telling them where to come and
-        who to meet.
+        Anyone whose lost report matches the item by 60% or more gets a notification telling them to come to the
+        security office.
       </>
     ),
   },
