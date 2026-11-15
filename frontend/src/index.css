@@ -281,6 +281,100 @@ td.empty {
   margin: 6px 0;
 }
 
+/* ---------- Quick links on the first page ---------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+  margin: 8px 0 28px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 132px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.tile:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  border-top-color: var(--accent-hover);
+  box-shadow: 0 4px 14px rgba(15, 42, 74, 0.12);
+  transform: translateY(-2px);
+}
+.tile:focus-visible {
+  outline-offset: 3px;
+}
+.tile-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tile-title {
+  display: flex;
+  align-items: center;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+.tile-text {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.tile.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.tile.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-text);
+}
+.tile.primary .tile-icon {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--accent-text);
+}
+.tile.primary .tile-text {
+  color: rgba(255, 255, 255, 0.85);
+}
+.guide-heading {
+  margin-top: 8px;
+}
+@media (max-width: 640px) {
+  .tiles {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .tile {
+    min-height: 0;
+    padding: 12px 14px;
+  }
+  .tile-text {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+  .tile:hover {
+    transform: none;
+  }
+}
+
 /* ---------- Cards and lists ---------- */
 
 .card {

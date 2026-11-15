@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppRoutes } from './App'
@@ -304,5 +304,28 @@ describe('S34: the Lost reports tab', () => {
     renderAt('/admin/reports')
     expect(await screen.findByText('403 · Not allowed')).toBeTruthy()
     expect(calls.filter((url) => url.startsWith('/api/admin/'))).toEqual([])
+  })
+})
+
+describe('the first page has big links to every tab', () => {
+  const tileLinks = () =>
+    Array.from(screen.getByRole('navigation', { name: 'Quick links' }).querySelectorAll('a')).map((a) =>
+      a.getAttribute('href'),
+    )
+
+  it('shows students their tabs, with the unread count', async () => {
+    fakeApi({ ...STUDENT, unread_notifications: 2 })
+    renderAt('/')
+    expect(await screen.findByRole('navigation', { name: 'Quick links' })).toBeTruthy()
+    expect(tileLinks()).toEqual(['/reports/new', '/reports', '/found', '/claims', '/notifications'])
+    const tiles = within(screen.getByRole('navigation', { name: 'Quick links' }))
+    expect(tiles.getByRole('link', { name: /Notifications.*2/ }).getAttribute('href')).toBe('/notifications')
+  })
+
+  it('shows admins the security office tabs, and no student ones', async () => {
+    fakeApi({ ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true })
+    renderAt('/')
+    expect(await screen.findByRole('navigation', { name: 'Quick links' })).toBeTruthy()
+    expect(tileLinks()).toEqual(['/admin/items/new', '/admin', '/admin/reports', '/admin/handovers', '/admin/admins', '/notifications'])
   })
 })

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../auth'
+import QuickLinks from '../QuickLinks'
 
 type Step = { title: string; body: ReactNode }
 
@@ -96,7 +97,10 @@ export default function GuidePage() {
 
   return (
     <>
-      <h1>How IITGN Lost &amp; Found works</h1>
+      <h1>{user?.name ? `Welcome, ${user.name.split(' ')[0]}` : 'Welcome'}</h1>
+      <QuickLinks />
+
+      <h2 className="guide-heading">How IITGN Lost &amp; Found works</h2>
 
       <h2>{admin ? 'For the security office' : 'If you lost something'}</h2>
       <ol className="steps">
