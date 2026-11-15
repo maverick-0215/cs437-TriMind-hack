@@ -22,7 +22,8 @@ export default function AdminItemNewPage() {
     try {
       const item = await api<AdminItem>('admin/items', { method: 'POST', body: form })
       // S13: the item page shows the suggested lost reports right away.
-      navigate(`/admin/items/${item.id}`)
+      // S32: if it was a repeat, open the saved one and say why nothing new was added.
+      navigate(`/admin/items/${item.id}`, item.repeat ? { state: { notice: 'This looks the same as an item you saved a moment ago (same details and photo), so it was not saved twice. If it is a second, separate item, add it again with a slightly different title, such as “(2)”.' } } : undefined)
     } catch (e) {
       setError((e as Error).message)
       saving.current = false

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useParams } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { api, useApi } from '../../api'
 import { formatDate, formatDateTime } from '../../format'
 import type { AdminItemDetail } from '../../types'
@@ -13,6 +13,8 @@ const CLAIM_TEXT = {
 }
 
 export default function AdminItemPage() {
+  // S32: set when the new-item form found this was a repeat of one saved moments ago.
+  const repeatNotice = (useLocation().state as { notice?: string } | null)?.notice
   const { id } = useParams()
   const { data, error, reload } = useApi<AdminItemDetail>(`admin/items/${id}`)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -78,6 +80,7 @@ export default function AdminItemPage() {
       <h1>
         {item.title} <span className={`status ${item.status.toLowerCase()}`}>{item.status.toLowerCase()}</span>
       </h1>
+      {repeatNotice && <p className="info">{repeatNotice}</p>}
       {/* While the approve form is open, its errors show under it instead (where the guard is looking). */}
       {actionError && item.status !== 'AVAILABLE' && <p className="error">{actionError}</p>}
       {notice && <p className="info">{notice}</p>}

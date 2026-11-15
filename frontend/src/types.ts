@@ -35,6 +35,8 @@ export type ItemStatus = 'AVAILABLE' | 'CLAIMED' | 'RETURNED'
 export type ClaimStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
 export type AdminItem = PublicItem & {
+  // S32: true when this was a repeat of one saved moments ago, so nothing new was saved.
+  repeat?: boolean
   exact_location: string
   description: string
   has_photo: boolean
@@ -44,6 +46,8 @@ export type AdminItem = PublicItem & {
 }
 
 export type Report = {
+  // S32: true when this was a repeat of one filed moments ago, so nothing new was saved.
+  repeat?: boolean
   id: number
   category: string
   title: string

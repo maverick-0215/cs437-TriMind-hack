@@ -30,7 +30,7 @@ Each statement has at least one automated test that names its ID.
 - **S6.** A logged-in user can see a list of every `AVAILABLE` found item, newest first, with its title, category, date found, where it was found (general area) and who to contact: the security office (`SECURITY_CONTACT`), never an admin's own email.
 - **S7.** Students never see a found item's private details (exact location, description, photo) anywhere in the app or its API.
 - **S31.** The date found and the date lost cannot be after today. The date pickers do not offer future dates, and the API rejects them.
-- **S32.** Sending the same lost report or found item again within 2 minutes (a double click, or a retry on a slow connection) does not create a copy. The one already saved is returned, and nobody is notified twice. The form's button is disabled while it saves.
+- **S32.** Sending the same lost report or found item again within 2 minutes (a double click, or a retry on a slow connection) does not create a copy, as long as the photo is the same too (or neither has one). The one already saved is returned, the page says it was not saved twice, and nobody is notified twice. A different photo, or a photo added on a retry, makes a new record, so an uploaded photo is never dropped. The form's button is disabled while it saves.
 
 ### Lost reports
 
