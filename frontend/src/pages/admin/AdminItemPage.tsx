@@ -4,6 +4,8 @@ import { api, useApi } from '../../api'
 import { formatDate, formatDateTime } from '../../format'
 import type { AdminItemDetail } from '../../types'
 
+type EmailReply = { email_sent?: false; detail?: string }
+
 const CLAIM_TEXT = {
   PENDING: 'pending',
   APPROVED: 'approved',
@@ -19,15 +21,16 @@ export default function AdminItemPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  async function act(path: string, body?: object, setError = setActionError): Promise<boolean> {
+  /** False if it failed. Otherwise the reply: `email_sent: false` when the change was saved but its email did not go out. */
+  async function act(path: string, body?: object, setError = setActionError): Promise<EmailReply | false> {
     if (busy) return false
     setBusy(true)
     setError(null)
     setNotice(null)
     try {
-      await api(path, { method: 'POST', body })
+      const reply = await api<EmailReply | undefined>(path, { method: 'POST', body })
       reload()
-      return true
+      return reply ?? {}
     } catch (e) {
       setError((e as Error).message)
       return false
@@ -37,15 +40,21 @@ export default function AdminItemPage() {
   }
 
   async function approve(who: { report_id: number } | { email: string }, email: string) {
-    if (await act(`admin/items/${id}/approve`, who)) {
+    const reply = await act(`admin/items/${id}/approve`, who)
+    if (reply) {
       // S17: the code goes to the student's inbox, never to the admin.
-      setNotice(`Approved. We emailed ${email} their pickup code. Ask them for it at handover.`)
+      setNotice(
+        reply.email_sent === false
+          ? reply.detail!
+          : `Approved. We emailed ${email} their pickup code. Ask them for it at handover.`,
+      )
     }
   }
 
   async function cancel(claimId: number, email: string) {
-    if (await act(`admin/claims/${claimId}/cancel`)) {
-      setNotice(`Approval cancelled. We emailed ${email} to let them know.`)
+    const reply = await act(`admin/claims/${claimId}/cancel`)
+    if (reply) {
+      setNotice(reply.email_sent === false ? reply.detail! : `Approval cancelled. We emailed ${email} to let them know.`)
     }
   }
 

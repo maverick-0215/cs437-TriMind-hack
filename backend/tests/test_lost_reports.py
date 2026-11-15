@@ -148,3 +148,19 @@ def test_S33_admin_sees_the_report_photo_next_to_a_matching_item(student_client,
     student_client.post("/api/reports", {**S33_REPORT, "photo": _report_png()}, format="multipart")
     candidate = admin_client.get(f"/api/admin/items/{item.pk}").json()["candidates"][0]
     assert candidate["has_photo"] is True
+
+
+@pytest.mark.django_db
+def test_S33_student_can_add_photos_to_at_most_10_reports_a_day(student_client, other_client):
+    def file(client, n, **extra):
+        return client.post("/api/reports", {**S33_REPORT, "title": f"Blue backpack {n}", **extra}, format="multipart")
+
+    for n in range(10):
+        assert file(student_client, n, photo=_report_png()).status_code == 201
+    refused = file(student_client, 10, photo=_report_png())
+    assert refused.status_code == 400
+    assert "photo" in str(refused.json()).lower()
+    assert LostReport.objects.count() == 10
+    # The report itself can still be filed, without a photo, and other students are unaffected.
+    assert file(student_client, 11).status_code == 201
+    assert file(other_client, 0, photo=_report_png()).status_code == 201
