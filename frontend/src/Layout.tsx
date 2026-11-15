@@ -26,24 +26,8 @@ export default function Layout() {
           </button>
           {/* Clicking any link closes the menu again. */}
           <nav id="main-nav" className={menuOpen ? 'open' : ''} onClick={() => setMenuOpen(false)}>
+            {/* Every other tab is a box on the first page (Guide), so the corner stays short. */}
             <NavLink to="/guide">Guide</NavLink>
-            {user?.is_admin ? (
-              <>
-                <NavLink to="/admin" end>
-                  Security desk
-                </NavLink>
-                <NavLink to="/admin/items/new">Add found item</NavLink>
-                <NavLink to="/admin/reports">Lost reports</NavLink>
-                <NavLink to="/admin/handovers">Handovers</NavLink>
-                <NavLink to="/admin/admins">Admins</NavLink>
-              </>
-            ) : (
-              <>
-                <NavLink to="/found">Found items</NavLink>
-                <NavLink to="/reports">My lost reports</NavLink>
-                <NavLink to="/claims">Pickup codes</NavLink>
-              </>
-            )}
             <NavLink to="/notifications">
               Notifications
               {user && user.unread_notifications > 0 && <span className="badge">{user.unread_notifications}</span>}

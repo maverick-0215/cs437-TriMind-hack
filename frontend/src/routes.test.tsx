@@ -167,7 +167,11 @@ it('S6: students see every found item with where it was found and who to contact
   expect(await screen.findByText('Steel bottle')).toBeTruthy()
   expect(screen.getByText('Mess')).toBeTruthy()
   expect(screen.getByText(/Security Office, Main Gate/)).toBeTruthy()
-  expect(screen.getByRole('link', { name: 'Found items' })).toBeTruthy()
+  // Students reach Found items from its box on the first page (the top menu no longer lists it).
+  cleanup()
+  renderAt('/')
+  const tiles = within(await screen.findByRole('navigation', { name: 'Quick links' }))
+  expect(tiles.getByRole('link', { name: /Found items/ }).getAttribute('href')).toBe('/found')
 })
 
 it('S17: after approving someone, the guard is told their pickup code was emailed to them', async () => {
@@ -296,7 +300,6 @@ describe('S34: the Lost reports tab', () => {
     expect(screen.getByText(/place not given/)).toBeTruthy()
     expect(screen.getByText('Metro card inside')).toBeTruthy()
     expect(screen.getByRole('link', { name: 'Brown leather wallet' }).getAttribute('href')).toBe('/admin/items/9')
-    expect(screen.getByRole('link', { name: 'Lost reports' })).toBeTruthy()
   })
 
   it('S34: students get 403 and never call the admin API', async () => {
@@ -313,19 +316,23 @@ describe('the first page has big links to every tab', () => {
       a.getAttribute('href'),
     )
 
-  it('shows students their tabs, with the unread count', async () => {
-    fakeApi({ ...STUDENT, unread_notifications: 2 })
+  it('shows students their tabs; Notifications stays in the top right', async () => {
+    fakeApi(STUDENT)
     renderAt('/')
     expect(await screen.findByRole('navigation', { name: 'Quick links' })).toBeTruthy()
-    expect(tileLinks()).toEqual(['/reports/new', '/reports', '/found', '/claims', '/notifications'])
-    const tiles = within(screen.getByRole('navigation', { name: 'Quick links' }))
-    expect(tiles.getByRole('link', { name: /Notifications.*2/ }).getAttribute('href')).toBe('/notifications')
+    expect(tileLinks()).toEqual(['/reports/new', '/reports', '/found', '/claims'])
+    // The top menu keeps only Guide, Notifications and Log out.
+    const menu = within(document.getElementById('main-nav')!)
+    expect(menu.getAllByRole('link').map((a) => a.textContent)).toEqual(['Guide', 'Notifications'])
+    expect(menu.getByRole('button', { name: 'Log out' })).toBeTruthy()
   })
 
   it('shows admins the security office tabs, and no student ones', async () => {
     fakeApi({ ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true })
     renderAt('/')
     expect(await screen.findByRole('navigation', { name: 'Quick links' })).toBeTruthy()
-    expect(tileLinks()).toEqual(['/admin/items/new', '/admin', '/admin/reports', '/admin/handovers', '/admin/admins', '/notifications'])
+    expect(tileLinks()).toEqual(['/admin/items/new', '/admin', '/admin/reports', '/admin/handovers', '/admin/admins'])
+    const tiles = within(screen.getByRole('navigation', { name: 'Quick links' }))
+    expect(tiles.getByRole('link', { name: /Add admins/ }).getAttribute('href')).toBe('/admin/admins')
   })
 })
