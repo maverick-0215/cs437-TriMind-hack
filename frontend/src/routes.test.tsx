@@ -371,3 +371,44 @@ describe('the first page has big links to every tab', () => {
     expect(tiles.getByRole('link', { name: /Add admins/ }).getAttribute('href')).toBe('/admin/admins')
   })
 })
+
+describe('S32: a repeat is not saved twice, and the page says so', () => {
+  const ADMIN = { ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true }
+  const detail = {
+    item: {
+      id: 1, category: 'Bottle', title: 'Steel water bottle', date_found: '2026-10-06', general_area: 'Mess',
+      exact_location: 'Counter', description: 'Dented lid', has_photo: false, status: 'AVAILABLE',
+      added_by: 'guard@iitgn.ac.in', created_at: '2026-10-06T10:00:00Z',
+    },
+    claims: [], awaiting_pickup_by: null, handover: null, candidates: [],
+  }
+
+  function fakeServer(repeat: boolean) {
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+      if (url === '/api/auth/me') return json(ADMIN)
+      if (url === '/api/admin/items' && init?.method === 'POST')
+        return json({ ...detail.item, ...(repeat ? { repeat: true } : {}) }, repeat ? 200 : 201)
+      if (url === '/api/admin/items/1') return json(detail)
+      return json([])
+    })
+  }
+
+  async function addItem() {
+    renderAt('/admin/items/new')
+    fireEvent.submit((await screen.findByText('Add item')).closest('form')!)
+    return screen.findByRole('heading', { name: /Steel water bottle/ })
+  }
+
+  it('S32: tells the guard when the item was a repeat of one just saved', async () => {
+    fakeServer(true)
+    await addItem()
+    expect(screen.getByText(/so it was not saved twice/)).toBeTruthy()
+  })
+
+  it('S32: says nothing extra for a normal new item', async () => {
+    fakeServer(false)
+    await addItem()
+    expect(screen.queryByText(/so it was not saved twice/)).toBeNull()
+  })
+})

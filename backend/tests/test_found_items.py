@@ -176,3 +176,52 @@ def test_S4_photo_over_5_mb_is_rejected(admin_client):
     assert response.status_code == 400
     assert "5 MB" in str(response.json())
     assert not FoundItem.objects.exists()
+
+
+def _photo(color):
+    buf = BytesIO()
+    Image.new("RGB", (4, 4), color).save(buf, "PNG")
+    return SimpleUploadedFile(f"{color}.png", buf.getvalue(), content_type="image/png")
+
+
+S32_ITEM = {
+    "category": "Bottle", "title": "Steel water bottle", "date_found": "2026-10-10",
+    "general_area": "Library", "exact_location": "Desk 14", "description": "Dented lid",
+}
+
+
+def _photo_bytes(admin_client, item_id):
+    return b"".join(admin_client.get(f"/api/admin/items/{item_id}/photo").streaming_content)
+
+
+@pytest.mark.django_db
+def test_S32_same_text_with_a_different_photo_is_a_new_item(admin_client):
+    red = admin_client.post("/api/admin/items", {**S32_ITEM, "photo": _photo("red")}, format="multipart")
+    blue = admin_client.post("/api/admin/items", {**S32_ITEM, "photo": _photo("blue")}, format="multipart")
+    assert (red.status_code, blue.status_code) == (201, 201)
+    assert red.json()["id"] != blue.json()["id"]
+    assert FoundItem.objects.count() == 2
+    # Each keeps its own photo: nothing uploaded is dropped.
+    assert _photo_bytes(admin_client, red.json()["id"]) == _photo("red").read()
+    assert _photo_bytes(admin_client, blue.json()["id"]) == _photo("blue").read()
+
+
+@pytest.mark.django_db
+def test_S32_a_photo_added_on_a_retry_is_kept(admin_client):
+    first = admin_client.post("/api/admin/items", S32_ITEM, format="multipart")
+    retry = admin_client.post("/api/admin/items", {**S32_ITEM, "photo": _photo("red")}, format="multipart")
+    assert (first.status_code, retry.status_code) == (201, 201)
+    assert retry.json()["has_photo"] is True
+    assert _photo_bytes(admin_client, retry.json()["id"]) == _photo("red").read()
+
+
+@pytest.mark.django_db
+def test_S32_the_same_photo_sent_twice_is_still_saved_once_and_says_so(admin_client):
+    first = admin_client.post("/api/admin/items", {**S32_ITEM, "photo": _photo("red")}, format="multipart")
+    again = admin_client.post("/api/admin/items", {**S32_ITEM, "photo": _photo("red")}, format="multipart")
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert again.json()["id"] == first.json()["id"]
+    assert FoundItem.objects.count() == 1
+    # Not silent: the answer says it was a repeat of one saved moments ago.
+    assert again.json()["repeat"] is True
+    assert first.json().get("repeat", False) is False

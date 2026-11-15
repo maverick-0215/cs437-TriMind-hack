@@ -22,7 +22,8 @@ export default function ReportNewPage() {
       const form = new FormData(event.currentTarget)
       if (!(form.get('photo') as File | null)?.size) form.delete('photo')
       const report = await api<Report>('reports', { method: 'POST', body: form })
-      navigate(`/reports/${report.id}`)
+      // S32: if it was a repeat, open the saved one and say why nothing new was filed.
+      navigate(`/reports/${report.id}`, report.repeat ? { state: { notice: 'This looks the same as a report you filed a moment ago (same details and photo), so it was not filed twice.' } } : undefined)
     } catch (e) {
       setError((e as Error).message)
       saving.current = false

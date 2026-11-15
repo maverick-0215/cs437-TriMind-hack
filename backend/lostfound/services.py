@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import re
 import secrets
@@ -67,13 +68,37 @@ def lock_user(user):
     get_user_model().objects.select_for_update().filter(pk=user.pk).first()
 
 
+def _digest(file):
+    """A fingerprint of a photo's bytes, leaving the file ready to be read again."""
+    file.seek(0)
+    digest = hashlib.sha256(file.read()).hexdigest()
+    file.seek(0)
+    return digest
+
+
+def _same_photo(saved, upload):
+    """S32: a repeat only if the photo is the same too: both without one, or the same bytes.
+    A different photo, or one added on a retry, is never thrown away."""
+    if not upload:
+        return not saved
+    if not saved:
+        return False
+    with saved.open("rb") as f:
+        return _digest(f) == _digest(upload)
+
+
+def _first_with_same_photo(candidates, data):
+    return next((record for record in candidates if _same_photo(record.photo, data.get("photo"))), None)
+
+
 def recent_duplicate_report(student, data):
-    """S32: the same lost report from the same student in the last two minutes, if any."""
-    return LostReport.objects.filter(
+    """S32: the same lost report (text and photo) from the same student in the last two minutes, if any."""
+    candidates = LostReport.objects.filter(
         student=student,
         created_at__gte=timezone.now() - DUPLICATE_WINDOW,
         **{field: data.get(field, "") for field in REPORT_FIELDS},
-    ).first()
+    )
+    return _first_with_same_photo(candidates, data)
 
 
 REPORT_PHOTOS_PER_DAY = 10
@@ -90,12 +115,13 @@ def photo_limit_reached(student):
 
 
 def recent_duplicate_item(admin, data):
-    """S32: the same found item from the same admin in the last two minutes, if any."""
-    return FoundItem.objects.filter(
+    """S32: the same found item (text and photo) from the same admin in the last two minutes, if any."""
+    candidates = FoundItem.objects.filter(
         added_by=admin,
         created_at__gte=timezone.now() - DUPLICATE_WINDOW,
         **{field: data[field] for field in ITEM_FIELDS},
-    ).first()
+    )
+    return _first_with_same_photo(candidates, data)
 
 
 # --- Matching (S13, S25, S26) ---

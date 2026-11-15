@@ -298,3 +298,27 @@ def test_S33_student_can_add_photos_to_at_most_10_reports_a_day(student_client, 
     # The report itself can still be filed, without a photo, and other students are unaffected.
     assert file(student_client, 11).status_code == 201
     assert file(other_client, 0, photo=_report_png()).status_code == 201
+
+
+@pytest.mark.django_db
+def test_S32_lost_report_with_a_different_or_added_photo_is_kept(student_client):
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    def photo(color):
+        buf = BytesIO()
+        Image.new("RGB", (4, 4), color).save(buf, "PNG")
+        return SimpleUploadedFile(f"{color}.png", buf.getvalue(), content_type="image/png")
+
+    def post(**extra):
+        return student_client.post("/api/reports", {**S33_REPORT, **extra}, format="multipart")
+
+    codes = [post().status_code, post(photo=photo("red")).status_code, post(photo=photo("blue")).status_code]
+    assert codes == [201, 201, 201]
+    assert sorted(bool(r.photo) for r in LostReport.objects.all()) == [False, True, True]
+    # The same photo again is a double click: saved once, and the answer says so.
+    again = post(photo=photo("blue"))
+    assert again.status_code == 200 and again.json()["repeat"] is True
+    assert LostReport.objects.count() == 3

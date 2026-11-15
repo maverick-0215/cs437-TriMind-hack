@@ -1,9 +1,10 @@
-import { useParams } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { useApi } from '../api'
 import { formatDate, formatDateTime } from '../format'
 import { REPORT_STATUS, type ReportDetail } from '../types'
 
 export default function ReportDetailPage() {
+  const notice = (useLocation().state as { notice?: string } | null)?.notice
   const { id } = useParams()
   const { data: report, error } = useApi<ReportDetail>(`reports/${id}`)
 
@@ -16,6 +17,7 @@ export default function ReportDetailPage() {
         {report.title}{' '}
         <span className={`status ${REPORT_STATUS[report.status].className}`}>{REPORT_STATUS[report.status].label}</span>
       </h1>
+      {notice && <p className="info">{notice}</p>}
       <dl className="card details">
         <dt>Category</dt>
         <dd>{report.category}</dd>

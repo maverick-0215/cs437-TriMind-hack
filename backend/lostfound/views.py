@@ -67,9 +67,10 @@ def reports(request):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             services.lock_user(request.user)
-            # S32: sent twice by mistake? Return the report already saved instead of a copy.
+            # S32: sent twice by mistake? Return the report already saved instead of a copy,
+            # and say so ("repeat"), so the page can tell the student.
             if existing := services.recent_duplicate_report(request.user, serializer.validated_data):
-                return Response(ReportSerializer(existing).data, status=status.HTTP_200_OK)
+                return Response({**ReportSerializer(existing).data, "repeat": True}, status=status.HTTP_200_OK)
             # S33: a cap on photos per day, so one account cannot fill the server's disk.
             if serializer.validated_data.get("photo") and services.photo_limit_reached(request.user):
                 return Response(
@@ -131,9 +132,10 @@ def admin_items(request):
         serializer.is_valid(raise_exception=True)
         with transaction.atomic():
             services.lock_user(request.user)
-            # S32: sent twice by mistake? Return the item already saved, and notify no one again.
+            # S32: sent twice by mistake? Return the item already saved, notify no one again, and
+            # say so ("repeat"), so the page can tell the admin.
             if existing := services.recent_duplicate_item(request.user, serializer.validated_data):
-                return Response(AdminItemSerializer(existing).data, status=status.HTTP_200_OK)
+                return Response({**AdminItemSerializer(existing).data, "repeat": True}, status=status.HTTP_200_OK)
             item = serializer.save(added_by=request.user)  # S5: status defaults to AVAILABLE
         services.notify_matching_reports(item)  # S26
         return Response(serializer.data, status=status.HTTP_201_CREATED)
