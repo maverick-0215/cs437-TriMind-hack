@@ -26,8 +26,8 @@ export default function Layout() {
           </button>
           {/* Clicking any link closes the menu again. */}
           <nav id="main-nav" className={menuOpen ? 'open' : ''} onClick={() => setMenuOpen(false)}>
-            {/* Every other tab is a box on the first page (Guide), so the corner stays short. */}
-            <NavLink to="/guide">Guide</NavLink>
+            {/* Every other tab is a box on the first page (Home), so the corner stays short. */}
+            <NavLink to="/guide">Home</NavLink>
             <NavLink to="/notifications">
               Notifications
               {user && user.unread_notifications > 0 && <span className="badge">{user.unread_notifications}</span>}

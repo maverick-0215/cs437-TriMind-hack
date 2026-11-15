@@ -100,7 +100,7 @@ describe('guide comes first', () => {
     renderAt('/')
     expect(await screen.findByRole('heading', { name: 'How IITGN Lost & Found works' })).toBeTruthy()
     expect(screen.getByText('File a lost report', { selector: 'strong' })).toBeTruthy()
-    expect(screen.getAllByRole('link')[1].textContent).toBe('Guide')
+    expect(screen.getAllByRole('link')[1].textContent).toBe('Home')
   })
 
   it('shows guards the security office steps', async () => {
@@ -356,9 +356,9 @@ describe('the first page has big links to every tab', () => {
     renderAt('/')
     expect(await screen.findByRole('navigation', { name: 'Quick links' })).toBeTruthy()
     expect(tileLinks()).toEqual(['/reports/new', '/reports', '/found', '/claims'])
-    // The top menu keeps only Guide, Notifications and Log out.
+    // The top menu keeps only Home, Notifications and Log out.
     const menu = within(document.getElementById('main-nav')!)
-    expect(menu.getAllByRole('link').map((a) => a.textContent)).toEqual(['Guide', 'Notifications'])
+    expect(menu.getAllByRole('link').map((a) => a.textContent)).toEqual(['Home', 'Notifications'])
     expect(menu.getByRole('button', { name: 'Log out' })).toBeTruthy()
   })
 
@@ -411,4 +411,11 @@ describe('S32: a repeat is not saved twice, and the page says so', () => {
     await addItem()
     expect(screen.queryByText(/so it was not saved twice/)).toBeNull()
   })
+})
+
+it('admins have no "Go to the security desk" button on the first page', async () => {
+  fakeApi({ ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true })
+  renderAt('/')
+  expect(await screen.findByText('For the security office')).toBeTruthy()
+  expect(screen.queryByText('Go to the security desk')).toBeNull()
 })
