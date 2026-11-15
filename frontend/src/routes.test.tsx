@@ -419,3 +419,26 @@ it('admins have no "Go to the security desk" button on the first page', async ()
   expect(await screen.findByText('For the security office')).toBeTruthy()
   expect(screen.queryByText('Go to the security desk')).toBeNull()
 })
+
+it('the security desk lists only available items', async () => {
+  const item = (id: number, title: string, status: string) => ({
+    id,
+    title,
+    status,
+    category: 'Bag',
+    date_found: '2026-11-01',
+    general_area: 'Library',
+  })
+  vi.stubGlobal('fetch', async (url: string) => {
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
+    if (url === '/api/auth/me') return json({ ...STUDENT, email: 'guard@iitgn.ac.in', is_admin: true })
+    if (url === '/api/auth/config') return json({ google_client_id: '', dev_login: true })
+    if (url === '/api/admin/items')
+      return json([item(1, 'Blue bag', 'AVAILABLE'), item(2, 'Red bag', 'CLAIMED'), item(3, 'Green bag', 'RETURNED')])
+    return json([])
+  })
+  renderAt('/admin')
+  expect(await screen.findByText('Blue bag')).toBeTruthy()
+  expect(screen.queryByText('Red bag')).toBeNull()
+  expect(screen.queryByText('Green bag')).toBeNull()
+})
