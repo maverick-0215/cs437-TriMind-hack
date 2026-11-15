@@ -6,6 +6,8 @@ import type { AdminClaim, AdminItem } from '../../types'
 export default function AdminDashboardPage() {
   const { data: pending } = useApi<AdminClaim[]>('admin/pickups')
   const { data: items, error } = useApi<AdminItem[]>('admin/items')
+  // Only items still waiting for an owner: claimed ones are under Waiting for pickup, returned ones in Handovers.
+  const available = items?.filter((item) => item.status === 'AVAILABLE')
 
   return (
     <>
@@ -35,7 +37,11 @@ export default function AdminDashboardPage() {
         ))}
       </ul>
 
-      <h2>All found items</h2>
+      <h2>Available items</h2>
+      <p className="muted">
+        Found items no one has been approved for yet. Approved items are under Waiting for pickup above, and collected
+        ones are in <Link to="/admin/handovers">Handovers</Link>.
+      </p>
       {error && <p className="error">{error}</p>}
       <div className="table-scroll">
         <table>
@@ -44,26 +50,22 @@ export default function AdminDashboardPage() {
               <th>Date found</th>
               <th>Category</th>
               <th>Title</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            {items?.map((item) => (
+            {available?.map((item) => (
               <tr key={item.id}>
                 <td>{formatDate(item.date_found)}</td>
                 <td>{item.category}</td>
                 <td>
                   <Link to={`/admin/items/${item.id}`}>{item.title}</Link>
                 </td>
-                <td>
-                  <span className={`status ${item.status.toLowerCase()}`}>{item.status.toLowerCase()}</span>
-                </td>
               </tr>
             ))}
-            {items?.length === 0 && (
+            {available?.length === 0 && (
               <tr>
-                <td colSpan={4} className="empty">
-                  No items yet.
+                <td colSpan={3} className="empty">
+                  No available items.
                 </td>
               </tr>
             )}
