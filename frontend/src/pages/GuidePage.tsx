@@ -140,11 +140,14 @@ export default function GuidePage() {
         )}
       </ul>
 
-      <p>
-        <Link className="button" to={admin ? '/admin' : '/reports/new'}>
-          {admin ? 'Go to the security desk' : 'File a lost report'}
-        </Link>
-      </p>
+      {/* Admins reach the security desk from its box at the top. */}
+      {!admin && (
+        <p>
+          <Link className="button" to="/reports/new">
+            File a lost report
+          </Link>
+        </p>
+      )}
     </>
   )
 }
